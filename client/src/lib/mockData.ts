@@ -18,6 +18,10 @@ const generateTransactions = (): Transaction[] => {
     { name: 'WeWork', defaultType: 'Business' },
     { name: 'Adobe Creative Cloud', defaultType: 'Business' },
     { name: 'Pret A Manger', defaultType: 'Personal' },
+    { name: 'Shopify Sales', defaultType: 'Business' },
+    { name: 'Upwork Earning', defaultType: 'Business' },
+    { name: 'PayPal Transfer', defaultType: 'Business' },
+    { name: 'Google Ads', defaultType: 'Business' },
   ];
 
   const categories = {
@@ -34,11 +38,12 @@ const generateTransactions = (): Transaction[] => {
     const date = subDays(today, daysAgo).toISOString();
     
     const merchant = merchants[Math.floor(Math.random() * merchants.length)];
-    const isIncome = merchant.name.includes('Client') || merchant.name.includes('Stripe');
+    const isIncome = merchant.name.includes('Client') || merchant.name.includes('Stripe') || merchant.name.includes('Shopify') || merchant.name.includes('Upwork') || merchant.name.includes('PayPal');
     
     let amount = 0;
     if (isIncome) {
       amount = Math.floor(Math.random() * 2000) + 100;
+      if (merchant.name.includes('Shopify')) amount = Math.floor(Math.random() * 500) + 50;
     } else {
       amount = (Math.floor(Math.random() * 200) + 5) * -1;
       if (merchant.name === 'Apple Store') amount = -1299;
