@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ComposedChart, Line, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from "recharts";
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, isSameMonth } from "date-fns";
 
 interface TransactionChartProps {
@@ -44,8 +44,9 @@ export function TransactionChart({ transactions, dateRange }: TransactionChartPr
       <CardContent className="pl-2">
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
+            <ComposedChart data={data} stackOffset="sign">
               <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+              <ReferenceLine y={0} stroke="#000" strokeWidth={1} />
               <XAxis 
                 dataKey="name" 
                 stroke="#888888" 
@@ -64,9 +65,16 @@ export function TransactionChart({ transactions, dateRange }: TransactionChartPr
                 cursor={{ fill: 'transparent' }}
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
               />
-              <Bar dataKey="Expenses" stackId="a" fill="hsl(var(--chart-2))" radius={[0, 0, 4, 4]} />
-              <Bar dataKey="Income" stackId="a" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Bar dataKey="Income" stackId="stack" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={20} />
+              <Bar dataKey="Expenses" stackId="stack" fill="hsl(var(--chart-2))" radius={[0, 0, 4, 4]} barSize={20} />
+              <Line 
+                type="monotone" 
+                dataKey="Profit" 
+                stroke="hsl(var(--foreground))" 
+                strokeWidth={2}
+                dot={{ r: 4, fill: "hsl(var(--foreground))", strokeWidth: 0 }}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </CardContent>
