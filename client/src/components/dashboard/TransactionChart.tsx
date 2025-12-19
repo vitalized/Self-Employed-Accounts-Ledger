@@ -26,13 +26,13 @@ export function TransactionChart({ transactions, dateRange }: TransactionChartPr
 
     const expense = monthTransactions
       .filter(t => t.businessType === 'Expense')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      .reduce((sum, t) => sum + t.amount, 0);
 
     return {
       name: format(month, 'MMM yy'),
       Income: income,
       Expenses: expense,
-      Profit: income - expense
+      Profit: income + expense
     };
   });
 
