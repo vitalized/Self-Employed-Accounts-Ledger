@@ -68,7 +68,15 @@ export default function Dashboard() {
       }
 
       // Type Filter
-      if (filters.type && t.type !== filters.type) return false;
+      if (filters.type && filters.type !== 'All') {
+        if (filters.type === 'Business Income') {
+          if (t.type !== 'Business' || t.businessType !== 'Income') return false;
+        } else if (filters.type === 'Business Expense') {
+          if (t.type !== 'Business' || t.businessType !== 'Expense') return false;
+        } else if (t.type !== filters.type) {
+          return false;
+        }
+      }
 
       // Category Filter
       if (filters.category && t.category !== filters.category) return false;

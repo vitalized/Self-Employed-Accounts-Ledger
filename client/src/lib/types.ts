@@ -26,7 +26,7 @@ export interface FilterState {
   dateRange: DateFilter;
   customStartDate?: Date;
   customEndDate?: Date;
-  type?: TransactionType | 'All';
+  type?: TransactionType | 'All' | 'Business Income' | 'Business Expense';
   category?: string | 'All';
   search: string;
 }
