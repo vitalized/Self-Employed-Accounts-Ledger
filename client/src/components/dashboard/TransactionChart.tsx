@@ -64,8 +64,8 @@ export function TransactionChart({ transactions, dateRange }: TransactionChartPr
                 cursor={{ fill: 'transparent' }}
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
               />
-              <Bar dataKey="Income" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Expenses" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Expenses" stackId="a" fill="hsl(var(--chart-2))" radius={[0, 0, 4, 4]} />
+              <Bar dataKey="Income" stackId="a" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
