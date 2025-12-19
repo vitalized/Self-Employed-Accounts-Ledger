@@ -69,7 +69,9 @@ export default function Dashboard() {
 
       // Type Filter
       if (filters.type && filters.type !== 'All') {
-        if (filters.type === 'Business Income') {
+        if (filters.type === 'Business') {
+          if (t.type !== 'Business') return false;
+        } else if (filters.type === 'Business Income') {
           if (t.type !== 'Business' || t.businessType !== 'Income') return false;
         } else if (filters.type === 'Business Expense') {
           if (t.type !== 'Business' || t.businessType !== 'Expense') return false;

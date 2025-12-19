@@ -59,8 +59,9 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Types</SelectItem>
-            <SelectItem value="Business Income">Business: Income</SelectItem>
-            <SelectItem value="Business Expense">Business: Spending</SelectItem>
+            <SelectItem value="Business" className="font-medium">Business</SelectItem>
+            <SelectItem value="Business Income" className="pl-6 text-muted-foreground">↳ Income</SelectItem>
+            <SelectItem value="Business Expense" className="pl-6 text-muted-foreground">↳ Spending</SelectItem>
             <SelectItem value="Personal">Personal</SelectItem>
             <SelectItem value="Unreviewed">Unreviewed</SelectItem>
           </SelectContent>
