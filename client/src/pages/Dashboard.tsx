@@ -126,14 +126,6 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <Filters 
-          filterState={filters} 
-          onFilterChange={(updates) => setFilters(prev => ({ ...prev, ...updates }))}
-          onRefresh={handleRefresh}
-          onExport={handleExport}
-          availableCategories={availableCategories}
-        />
-
         <StatCards 
           transactions={filteredTransactions} 
           dateLabel={filters.dateRange}
@@ -153,6 +145,15 @@ export default function Dashboard() {
                {filteredTransactions.length} transactions found
              </div>
            </div>
+
+           <Filters 
+            filterState={filters} 
+            onFilterChange={(updates) => setFilters(prev => ({ ...prev, ...updates }))}
+            onRefresh={handleRefresh}
+            onExport={handleExport}
+            availableCategories={availableCategories}
+          />
+
            <TransactionList 
              transactions={filteredTransactions} 
              onUpdateTransaction={handleTransactionUpdate}
