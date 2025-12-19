@@ -42,12 +42,24 @@ const generateTransactions = (): Transaction[] => {
     
     let amount = 0;
     if (isIncome) {
-      amount = Math.floor(Math.random() * 2000) + 100;
-      if (merchant.name.includes('Shopify')) amount = Math.floor(Math.random() * 500) + 50;
+      // Target ~£88k total income
+      // Weighted towards larger client payments
+      if (merchant.name.includes('Client')) {
+        amount = Math.floor(Math.random() * 2500) + 1500; // 1500-4000
+      } else if (merchant.name.includes('Shopify')) {
+        amount = Math.floor(Math.random() * 800) + 100; // 100-900
+      } else {
+        amount = Math.floor(Math.random() * 1500) + 500; // 500-2000
+      }
     } else {
-      amount = (Math.floor(Math.random() * 200) + 5) * -1;
-      if (merchant.name === 'Apple Store') amount = -1299;
-      if (merchant.name === 'WeWork') amount = -450;
+      // Target ~£9k total expenses
+      // Keep expenses generally low
+      amount = (Math.floor(Math.random() * 60) + 10) * -1; // 10-70
+      
+      // Occasional larger expenses
+      if (merchant.name === 'Apple Store') amount = -1299; // New Mac
+      if (merchant.name === 'WeWork') amount = -450; // Monthly desk
+      if (merchant.name === 'Adobe Creative Cloud') amount = -55;
     }
 
     // Determine type (randomly make some unreviewed)
