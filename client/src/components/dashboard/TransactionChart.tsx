@@ -1,12 +1,41 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
-import { ComposedChart, Line, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from "recharts";
+import { ComposedChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from "recharts";
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, isSameMonth } from "date-fns";
 
 interface TransactionChartProps {
   transactions: Transaction[];
   dateRange: { start: Date; end: Date };
 }
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="rounded-lg border bg-background p-2 shadow-sm">
+        <div className="mb-2 text-sm font-medium">{label}</div>
+        <div className="flex flex-col gap-1 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-[hsl(var(--chart-1))]" />
+            <span className="text-muted-foreground">Income:</span>
+            <span className="ml-auto font-medium text-foreground">£{data.Income.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-[hsl(var(--chart-2))]" />
+            <span className="text-muted-foreground">Expenses:</span>
+            <span className="ml-auto font-medium text-foreground">£{Math.abs(data.Expenses).toLocaleString()}</span>
+          </div>
+          <div className="mt-1 border-t pt-1 flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-foreground" />
+            <span className="font-medium">Profit:</span>
+            <span className="ml-auto font-bold">£{data.Profit.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function TransactionChart({ transactions, dateRange }: TransactionChartProps) {
   // Generate months array for the range
@@ -61,19 +90,9 @@ export function TransactionChart({ transactions, dateRange }: TransactionChartPr
                 axisLine={false}
                 tickFormatter={(value) => `£${value}`}
               />
-              <Tooltip 
-                cursor={{ fill: 'transparent' }}
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-              />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
               <Bar dataKey="Income" stackId="stack" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={40} />
               <Bar dataKey="Expenses" stackId="stack" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={40} />
-              <Line 
-                type="monotone" 
-                dataKey="Profit" 
-                stroke="hsl(var(--foreground))" 
-                strokeWidth={2}
-                dot={{ r: 4, fill: "hsl(var(--foreground))", strokeWidth: 0 }}
-              />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
