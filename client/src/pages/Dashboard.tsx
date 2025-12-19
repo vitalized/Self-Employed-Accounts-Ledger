@@ -15,8 +15,15 @@ export default function Dashboard() {
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'tax-year-current',
     search: '',
-    type: undefined
+    type: undefined,
+    category: undefined
   });
+
+  // Extract unique categories for filter
+  const availableCategories = useMemo(() => {
+    const categories = new Set(transactions.map(t => t.category).filter(Boolean));
+    return Array.from(categories).sort() as string[];
+  }, [transactions]);
 
   // Helper to get date range object
   const getDateRange = (filter: FilterState['dateRange']) => {
@@ -62,6 +69,9 @@ export default function Dashboard() {
 
       // Type Filter
       if (filters.type && t.type !== filters.type) return false;
+
+      // Category Filter
+      if (filters.category && t.category !== filters.category) return false;
 
       // Search Filter
       if (filters.search) {
@@ -121,6 +131,7 @@ export default function Dashboard() {
           onFilterChange={(updates) => setFilters(prev => ({ ...prev, ...updates }))}
           onRefresh={handleRefresh}
           onExport={handleExport}
+          availableCategories={availableCategories}
         />
 
         <StatCards 

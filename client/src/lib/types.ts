@@ -27,5 +27,6 @@ export interface FilterState {
   customStartDate?: Date;
   customEndDate?: Date;
   type?: TransactionType | 'All';
+  category?: string | 'All';
   search: string;
 }

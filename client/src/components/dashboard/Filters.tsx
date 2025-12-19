@@ -15,13 +15,14 @@ interface FiltersProps {
   onFilterChange: (updates: Partial<FilterState>) => void;
   onRefresh: () => void;
   onExport: () => void;
+  availableCategories: string[];
 }
 
-export function Filters({ filterState, onFilterChange, onRefresh, onExport }: FiltersProps) {
+export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories }: FiltersProps) {
   return (
     <div className="mb-6 flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
       <div className="flex flex-1 items-center space-x-2">
-        <div className="relative w-full max-w-sm">
+        <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
@@ -36,7 +37,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport }: Fi
           value={filterState.dateRange} 
           onValueChange={(value) => onFilterChange({ dateRange: value as DateFilter })}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
@@ -53,14 +54,29 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport }: Fi
           value={filterState.type || "All"} 
           onValueChange={(value) => onFilterChange({ type: value === 'All' ? undefined : value as any })}
         >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Type: All" />
+          <SelectTrigger className="w-[130px]">
+            <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="All">Type: All</SelectItem>
+            <SelectItem value="All">All Types</SelectItem>
             <SelectItem value="Business">Business</SelectItem>
             <SelectItem value="Personal">Personal</SelectItem>
             <SelectItem value="Unreviewed">Unreviewed</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select 
+          value={filterState.category || "All"} 
+          onValueChange={(value) => onFilterChange({ category: value === 'All' ? undefined : value })}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Categories</SelectItem>
+            {availableCategories.map(cat => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
