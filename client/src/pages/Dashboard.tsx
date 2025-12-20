@@ -6,7 +6,7 @@ import { TransactionList } from "@/components/dashboard/TransactionList";
 import { Filters } from "@/components/dashboard/Filters";
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { FilterState, Transaction } from "@/lib/types";
-import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO } from "date-fns";
+import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
@@ -41,9 +41,9 @@ export default function Dashboard() {
         return { start: startOfMonth(now), end: now };
       case 'last-month':
         const lastMonthStart = startOfMonth(subMonths(now, 1));
-        return { start: lastMonthStart, end: subMonths(now, 0) }; // End of last month roughly
+        return { start: lastMonthStart, end: endOfMonth(subMonths(now, 1)) };
       case 'last-3-months':
-        return { start: subMonths(now, 3), end: now };
+        return { start: startOfMonth(subMonths(now, 3)), end: endOfMonth(subMonths(now, 1)) };
       case 'tax-year-current':
         return { start: new Date(2025, 3, 1), end: new Date(2026, 2, 31) };
       case 'tax-year-previous':
