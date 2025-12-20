@@ -68,14 +68,6 @@ export function TransactionList({ transactions, onUpdateTransaction }: Transacti
                   >
                     Personal
                   </Button>
-                  <Button 
-                    variant={t.type === 'Split' ? 'secondary' : 'outline'} 
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => onUpdateTransaction(t.id, { type: 'Split' })}
-                  >
-                    Split
-                  </Button>
                 </div>
               </TableCell>
               <TableCell>
