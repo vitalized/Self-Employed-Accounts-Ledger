@@ -265,6 +265,40 @@ export default function Reports() {
         
         <TaxSummary transactions={filteredTransactions} yearLabel={getYearLabel(dateRange)} />
 
+        <Card>
+            <CardHeader>
+              <CardTitle>Profit & Loss Statement</CardTitle>
+              <CardDescription>Detailed financial statement</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                        <div className="font-semibold">Revenue</div>
+                        <div className="text-right font-semibold">£{financials.income.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <div className="font-medium text-muted-foreground">Operating Expenses</div>
+                        {expenseData.map((item) => (
+                             <div key={item.name} className="grid grid-cols-2 gap-4 pl-4 text-sm">
+                                <div>{item.name}</div>
+                                <div className="text-right text-red-500">-£{item.value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+                             </div>
+                        ))}
+                        <div className="grid grid-cols-2 gap-4 border-t pt-2 font-medium">
+                            <div>Total Expenses</div>
+                            <div className="text-right text-red-600">-£{financials.expenses.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 border-t border-slate-200 dark:border-slate-800 pt-4 text-lg font-bold">
+                        <div>Net Profit</div>
+                        <div className="text-right">£{financials.netProfit.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
       </div>
     </DashboardLayout>
   );
