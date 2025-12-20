@@ -20,9 +20,10 @@ interface FiltersProps {
   onRefresh: () => void;
   onExport: () => void;
   availableCategories: string[];
+  isSyncing?: boolean;
 }
 
-export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories }: FiltersProps) {
+export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories, isSyncing = false }: FiltersProps) {
   return (
     <div className="mb-6 flex flex-col space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -142,9 +143,9 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" onClick={onRefresh}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Sync Bank
+        <Button variant="outline" onClick={onRefresh} disabled={isSyncing}>
+          <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
+          {isSyncing ? "Syncing..." : "Sync Bank"}
         </Button>
         <Button onClick={onExport} className="bg-emerald-600 hover:bg-emerald-700">
           <Download className="mr-2 h-4 w-4" />

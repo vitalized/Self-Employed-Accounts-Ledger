@@ -14,8 +14,9 @@ import { useDataMode } from "@/lib/dataContext";
 export default function Dashboard() {
   const { toast } = useToast();
   const { useMockData } = useDataMode();
-  const { data: apiTransactions = [], isLoading } = useTransactions();
+  const { data: apiTransactions = [], isLoading, refetch } = useTransactions();
   const updateTransactionMutation = useUpdateTransaction();
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
   
@@ -132,18 +133,51 @@ export default function Dashboard() {
     });
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
     toast({
-      title: "Syncing with Bank",
+      title: "Syncing with Starling Bank",
       description: "Fetching latest transactions...",
     });
-    // Simulate delay
-    setTimeout(() => {
-      toast({
-        title: "Sync Complete",
-        description: "Your transactions are up to date.",
+
+    try {
+      const response = await fetch("/api/starling/sync", {
+        method: "POST"
       });
-    }, 1500);
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Refetch transactions to show new ones
+        await refetch();
+        toast({
+          title: "Sync Complete",
+          description: data.message || `Imported ${data.imported || 0} new transactions.`,
+        });
+      } else if (response.status === 401) {
+        toast({
+          title: "Not Connected",
+          description: "Please connect your Starling Bank account in Settings first.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: data.error || "Failed to sync with Starling Bank.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Sync Error",
+        description: "Failed to connect to the server. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   if (isLoading && !useMockData) {
@@ -192,6 +226,7 @@ export default function Dashboard() {
             onRefresh={handleRefresh}
             onExport={handleExport}
             availableCategories={availableCategories}
+            isSyncing={isSyncing}
           />
 
            <TransactionList 
