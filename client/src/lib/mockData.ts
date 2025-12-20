@@ -1,34 +1,32 @@
 import { Transaction, BusinessType } from './types';
 import { subDays, subMonths, format } from 'date-fns';
+import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@shared/categories';
 
 const generateTransactions = (): Transaction[] => {
   const transactions: Transaction[] = [];
   const merchants = [
-    { name: 'Starling Bank', defaultType: 'Business' },
-    { name: 'Apple Store', defaultType: 'Business' },
+    { name: 'Starling Bank', defaultType: 'Business', expenseCategory: 'Bank Charges' },
+    { name: 'Apple Store', defaultType: 'Business', expenseCategory: 'Office Costs' },
     { name: 'Stripe Payments UK', defaultType: 'Business' },
     { name: 'Waitrose', defaultType: 'Personal' },
-    { name: 'Amazon', defaultType: 'Unreviewed' },
-    { name: 'Uber Trip', defaultType: 'Business' },
-    { name: 'Shell Garage', defaultType: 'Business' },
+    { name: 'Amazon', defaultType: 'Unreviewed', expenseCategory: 'Office Costs' },
+    { name: 'Uber Trip', defaultType: 'Business', expenseCategory: 'Travel & Vehicle' },
+    { name: 'Shell Garage', defaultType: 'Business', expenseCategory: 'Travel & Vehicle' },
     { name: 'Tesco', defaultType: 'Personal' },
     { name: 'Netflix', defaultType: 'Personal' },
     { name: 'Client Payment Ref: 9932', defaultType: 'Business' },
-    { name: 'HMRC VAT', defaultType: 'Business' },
-    { name: 'WeWork', defaultType: 'Business' },
-    { name: 'Adobe Creative Cloud', defaultType: 'Business' },
+    { name: 'HMRC VAT', defaultType: 'Business', expenseCategory: 'Other Expenses' },
+    { name: 'WeWork', defaultType: 'Business', expenseCategory: 'Premises Costs' },
+    { name: 'Adobe Creative Cloud', defaultType: 'Business', expenseCategory: 'Office Costs' },
     { name: 'Pret A Manger', defaultType: 'Personal' },
     { name: 'Shopify Sales', defaultType: 'Business' },
     { name: 'Upwork Earning', defaultType: 'Business' },
     { name: 'PayPal Transfer', defaultType: 'Business' },
-    { name: 'Google Ads', defaultType: 'Business' },
+    { name: 'Google Ads', defaultType: 'Business', expenseCategory: 'Advertising' },
   ];
 
-  const categories = {
-    Business: ['Software', 'Office Supplies', 'Travel', 'Meals', 'Equipment', 'Services', 'Taxes'],
-    Personal: ['Groceries', 'Entertainment', 'Shopping', 'Transport'],
-    Income: ['Sales', 'Consulting', 'Refunds']
-  };
+  const expenseCategories = SA103_EXPENSE_CATEGORIES.map(c => c.label);
+  const incomeCategories = INCOME_CATEGORIES.map(c => c.label);
 
   // Generate for last 18 months
   const today = new Date();
@@ -73,15 +71,13 @@ const generateTransactions = (): Transaction[] => {
     if (type === 'Business') {
       if (isIncome) {
         businessType = 'Income';
-        category = 'Sales';
+        category = incomeCategories[Math.floor(Math.random() * incomeCategories.length)];
       } else {
         businessType = 'Expense';
-        const cats = categories.Business;
-        category = cats[Math.floor(Math.random() * cats.length)];
+        category = (merchant as any).expenseCategory || expenseCategories[Math.floor(Math.random() * expenseCategories.length)];
       }
     } else if (type === 'Personal') {
-      const cats = categories.Personal;
-      category = cats[Math.floor(Math.random() * cats.length)];
+      category = undefined;
     }
 
     transactions.push({

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
+import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
 
 interface TaxSummaryProps {
   transactions: Transaction[];
@@ -12,7 +13,7 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
     let turnover = 0;
     let otherIncome = 0;
 
-    // Expenses Map
+    // Expenses Map - aligned with SA103F boxes
     const expenses = {
       costOfGoods: 0, // 17
       construction: 0, // 18
@@ -24,7 +25,9 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
       advertising: 0, // 24
       interest: 0, // 25
       bankCharges: 0, // 26
+      badDebts: 0, // 27
       professional: 0, // 28 (Accountancy)
+      depreciation: 0, // 29
       other: 0, // 30
       disallowable: {
          travel: 0, // 35
@@ -41,21 +44,54 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
       if (t.businessType === 'Income') {
         turnover += amount;
       } else if (t.businessType === 'Expense') {
-        const cat = t.category || 'Other';
+        const cat = t.category || 'Other Expenses';
         
-        // Mapping logic
-        if (cat === 'Travel') {
-           expenses.travel += amount;
-           // Mock 5% disallowable for travel (e.g. personal use)
-           expenses.disallowable.travel += amount * 0.05;
-        } else if (cat === 'Office Supplies') {
-           expenses.admin += amount;
-        } else if (cat === 'Services') {
-           expenses.professional += amount;
-        } else if (cat === 'Equipment') {
-           expenses.costOfGoods += amount; // Treat equipment as cost of goods for this mapping roughly
-        } else {
-           expenses.other += amount;
+        // Map SA103 category labels to expense buckets
+        switch (cat) {
+          case 'Cost of Goods':
+            expenses.costOfGoods += amount;
+            break;
+          case 'Subcontractor Costs':
+            expenses.construction += amount;
+            break;
+          case 'Staff Costs':
+            expenses.wages += amount;
+            break;
+          case 'Travel & Vehicle':
+            expenses.travel += amount;
+            expenses.disallowable.travel += amount * 0.05; // 5% personal use estimate
+            break;
+          case 'Premises Costs':
+            expenses.rent += amount;
+            break;
+          case 'Repairs & Maintenance':
+            expenses.repairs += amount;
+            break;
+          case 'Office Costs':
+            expenses.admin += amount;
+            break;
+          case 'Advertising':
+            expenses.advertising += amount;
+            break;
+          case 'Loan Interest':
+            expenses.interest += amount;
+            break;
+          case 'Bank Charges':
+            expenses.bankCharges += amount;
+            break;
+          case 'Bad Debts':
+            expenses.badDebts += amount;
+            break;
+          case 'Professional Fees':
+            expenses.professional += amount;
+            break;
+          case 'Depreciation':
+            expenses.depreciation += amount;
+            break;
+          case 'Other Expenses':
+          default:
+            expenses.other += amount;
+            break;
         }
       }
     });
@@ -131,7 +167,9 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
          advertising: round(expenses.advertising),
          interest: round(expenses.interest),
          bankCharges: round(expenses.bankCharges),
+         badDebts: round(expenses.badDebts),
          professional: round(expenses.professional),
+         depreciation: round(expenses.depreciation),
          other: round(expenses.other),
        },
        disallowable: {
@@ -222,7 +260,9 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
                     <Row label="Advertising and business entertainment costs" valAllowable={data.expenses.advertising} boxAllowable="24" valDisallowable={data.disallowable.advertising} boxDisallowable="39" />
                     <Row label="Interest on bank and other loans" valAllowable={data.expenses.interest} boxAllowable="25" valDisallowable={0} boxDisallowable="40" />
                     <Row label="Bank, credit card and other financial charges" valAllowable={data.expenses.bankCharges} boxAllowable="26" valDisallowable={0} boxDisallowable="41" />
+                    <Row label="Irrecoverable debts written off" valAllowable={data.expenses.badDebts} boxAllowable="27" valDisallowable={0} boxDisallowable="42" />
                     <Row label="Accountancy, legal and other professional fees" valAllowable={data.expenses.professional} boxAllowable="28" valDisallowable={0} boxDisallowable="43" />
+                    <Row label="Depreciation and loss/profit on sale of assets" valAllowable={data.expenses.depreciation} boxAllowable="29" valDisallowable={0} boxDisallowable="44" />
                     <Row label="Other business expenses" valAllowable={data.expenses.other} boxAllowable="30" valDisallowable={data.disallowable.other} boxDisallowable="45" />
                     
                     <div className="pt-2">

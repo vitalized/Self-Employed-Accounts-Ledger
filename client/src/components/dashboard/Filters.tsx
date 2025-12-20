@@ -4,7 +4,9 @@ import {
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
-  SelectValue 
+  SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { DateFilter, FilterState } from "@/lib/types";
@@ -13,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 
 interface FiltersProps {
   filterState: FilterState;
@@ -130,14 +133,23 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           value={filterState.category || "All"} 
           onValueChange={(value) => onFilterChange({ category: value === 'All' ? undefined : value })}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[180px]" data-testid="filter-category">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Categories</SelectItem>
-            {availableCategories.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-            ))}
+            <SelectGroup>
+              <SelectLabel className="text-emerald-600">Income</SelectLabel>
+              {INCOME_CATEGORIES.map(cat => (
+                <SelectItem key={cat.code} value={cat.label}>{cat.label}</SelectItem>
+              ))}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="text-red-600">Expenses (SA103)</SelectLabel>
+              {SA103_EXPENSE_CATEGORIES.map(cat => (
+                <SelectItem key={cat.code} value={cat.label}>{cat.label}</SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
