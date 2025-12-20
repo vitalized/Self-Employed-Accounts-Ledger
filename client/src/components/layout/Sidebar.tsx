@@ -5,12 +5,26 @@ import {
   PieChart, 
   Settings, 
   LogOut, 
-  Briefcase 
+  Briefcase,
+  Sun,
+  Moon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -51,7 +65,19 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="border-t border-sidebar-border p-4">
+      <div className="border-t border-sidebar-border p-4 space-y-1">
+        <button 
+          onClick={toggleTheme}
+          className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+          data-testid="button-theme-toggle"
+        >
+          {mounted && theme === "dark" ? (
+            <Sun className="mr-3 h-5 w-5" />
+          ) : (
+            <Moon className="mr-3 h-5 w-5" />
+          )}
+          {mounted && theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </button>
         <button className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
           <LogOut className="mr-3 h-5 w-5" />
           Sign Out

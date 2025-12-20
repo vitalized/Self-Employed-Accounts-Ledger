@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, X, Play, ListFilter, Pencil, Check } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useDataMode } from "@/lib/dataContext";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,14 +24,12 @@ interface CategorizationRule {
 
 export default function Settings() {
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
   const { useMockData, setUseMockData } = useDataMode();
   const queryClient = useQueryClient();
   const [starlingConnected, setStarlingConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [token, setToken] = useState("");
-  const [mounted, setMounted] = useState(false);
   const [showSetupGuide, setShowSetupGuide] = useState(false);
 
   // Rules state
@@ -180,7 +177,6 @@ export default function Settings() {
 
   // Check Starling connection status on mount
   useEffect(() => {
-    setMounted(true);
     checkStarlingStatus();
   }, []);
 
@@ -529,22 +525,6 @@ export default function Settings() {
                </div>
             </div>
 
-            <Separator />
-
-            <div className="flex items-center justify-between">
-               <div className="space-y-0.5">
-                  <Label>Dark Mode</Label>
-                  <p className="text-[0.8rem] text-muted-foreground">
-                     Toggle application theme
-                  </p>
-               </div>
-               <Switch 
-                  checked={mounted && theme === "dark"}
-                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-                  disabled={!mounted}
-               />
-            </div>
-            
             <Separator />
             
              <div className="flex items-center justify-between">
