@@ -63,10 +63,63 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
     // Rounding
     const round = (n: number) => Math.round(n);
     
+    // Profit Calculation
+    const totalExpenses = round(
+         Object.values(expenses)
+           .filter((val): val is number => typeof val === 'number')
+           .reduce((a, b) => a + b, 0) - 
+         (expenses.disallowable.travel + expenses.disallowable.advertising + expenses.disallowable.other)
+       );
+    const totalIncome = round(turnover + otherIncome);
+    const netProfit = Math.max(0, totalIncome - totalExpenses);
+
+    // Tax Calculation (Mock 2024/25 Rates)
+    // Personal Allowance: £12,570
+    // Basic Rate (20%): £12,571 - £50,270
+    // Higher Rate (40%): £50,271 - £125,140
+    // Additional Rate (45%): £125,140+
+    
+    const personalAllowance = 12570;
+    const taxableIncome = Math.max(0, netProfit - personalAllowance);
+    let incomeTax = 0;
+
+    if (taxableIncome > 0) {
+        const basicRateLimit = 37700; // 50270 - 12570
+        if (taxableIncome <= basicRateLimit) {
+            incomeTax += taxableIncome * 0.20;
+        } else {
+            incomeTax += basicRateLimit * 0.20;
+            const higherRateLimit = 125140 - 50270;
+            const remaining = taxableIncome - basicRateLimit;
+            if (remaining <= higherRateLimit) {
+                 incomeTax += remaining * 0.40;
+            } else {
+                 incomeTax += higherRateLimit * 0.40;
+                 incomeTax += (remaining - higherRateLimit) * 0.45;
+            }
+        }
+    }
+
+    // Class 4 NI (Self Employed)
+    // 2024/25: 6% on profits between £12,570 and £50,270
+    // 2% on profits over £50,270
+    let class4NI = 0;
+    if (netProfit > 12570) {
+        const niTable = Math.min(netProfit, 50270) - 12570;
+        class4NI += niTable * 0.06;
+        
+        if (netProfit > 50270) {
+            class4NI += (netProfit - 50270) * 0.02;
+        }
+    }
+
+    // Class 2 NI (Abolished/Zero for many in 24/25 but keeping placeholder as per screenshot request)
+    const class2NI = 0;
+
     return {
        turnover: round(turnover),
        otherIncome: round(otherIncome),
-       totalIncome: round(turnover + otherIncome),
+       totalIncome,
        expenses: {
          costOfGoods: round(expenses.costOfGoods),
          construction: round(expenses.construction),
@@ -86,15 +139,17 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
          advertising: round(expenses.disallowable.advertising),
          other: round(expenses.disallowable.other),
        },
-       totalExpenses: round(
-         Object.values(expenses)
-           .filter((val): val is number => typeof val === 'number')
-           .reduce((a, b) => a + b, 0) - 
-         (expenses.disallowable.travel + expenses.disallowable.advertising + expenses.disallowable.other)
-       ),
+       totalExpenses,
        totalDisallowable: round(
          expenses.disallowable.travel + expenses.disallowable.advertising + expenses.disallowable.other
-       )
+       ),
+       netProfit: round(netProfit),
+       tax: {
+           incomeTax: round(incomeTax),
+           class4NI: round(class4NI),
+           class2NI: round(class2NI),
+           total: round(incomeTax + class4NI + class2NI)
+       }
     };
   }, [transactions]);
 
@@ -175,6 +230,27 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
                     </div>
                 </div>
                  <p className="text-right text-xs text-muted-foreground mt-2">SA103F box numbers included</p>
+            </div>
+
+            {/* Net Profit Section */}
+            <div>
+                 <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">Net profit or loss</h3>
+                 <div className="space-y-1">
+                    <Row label="Total business income" valAllowable={data.totalIncome} />
+                    <Row label="Total allowable expenses" valAllowable={data.totalExpenses} boxAllowable="31" />
+                    <Row label="NET PROFIT" valAllowable={data.netProfit} boxAllowable="47" isTotal />
+                 </div>
+            </div>
+
+            {/* Tax Section */}
+            <div>
+                 <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">Tax</h3>
+                 <div className="space-y-1">
+                    <Row label="Income tax" valAllowable={data.tax.incomeTax} />
+                    <Row label="Class 4 National Insurance Contribution" valAllowable={data.tax.class4NI} />
+                    <Row label="Class 2 National Insurance Contribution" valAllowable={data.tax.class2NI} />
+                    <Row label="TOTAL TAX" valAllowable={data.tax.total} isTotal />
+                 </div>
             </div>
 
         </div>
