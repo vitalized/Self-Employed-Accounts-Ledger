@@ -7,10 +7,11 @@ import { Transaction } from "@/lib/types";
 import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { TaxSummary } from "@/components/reports/TaxSummary";
+import { useTransactions } from "@/lib/queries";
 
 export default function Reports() {
   const [dateRange, setDateRange] = useState('tax-year-current');
-  const [transactions] = useState<Transaction[]>(MOCK_TRANSACTIONS);
+  const { data: transactions = [], isLoading } = useTransactions();
 
   // Helper to get date range object
   const getFilterDateRange = (filter: string) => {
@@ -139,6 +140,16 @@ export default function Reports() {
 
      return Object.keys(months).sort().map(k => months[k]);
   }, [filteredTransactions]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-muted-foreground">Loading data...</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

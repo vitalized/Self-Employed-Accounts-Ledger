@@ -8,10 +8,13 @@ import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { FilterState, Transaction } from "@/lib/types";
 import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useTransactions, useUpdateTransaction } from "@/lib/queries";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const [transactions, setTransactions] = useState<Transaction[]>(MOCK_TRANSACTIONS);
+  const { data: transactions = [], isLoading } = useTransactions();
+  const updateTransactionMutation = useUpdateTransaction();
+  
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'tax-year-current',
     search: '',
@@ -102,12 +105,20 @@ export default function Dashboard() {
     });
   }, [transactions, filters, dateRange]);
 
-  const handleTransactionUpdate = (id: string, updates: Partial<Transaction>) => {
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    toast({
-      title: "Transaction Updated",
-      description: "Changes have been saved.",
-    });
+  const handleTransactionUpdate = async (id: string, updates: Partial<Transaction>) => {
+    try {
+      await updateTransactionMutation.mutateAsync({ id, updates });
+      toast({
+        title: "Transaction Updated",
+        description: "Changes have been saved.",
+      });
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update transaction. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExport = () => {
@@ -130,6 +141,16 @@ export default function Dashboard() {
       });
     }, 1500);
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-muted-foreground">Loading transactions...</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
