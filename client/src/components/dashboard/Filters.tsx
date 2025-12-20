@@ -66,7 +66,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {filterState.customStartDate ? format(filterState.customStartDate, "PPP") : <span>Start date</span>}
+                  {filterState.customStartDate ? format(filterState.customStartDate, "dd/MM/yyyy") : <span>Start date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -74,6 +74,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                   mode="single"
                   selected={filterState.customStartDate}
                   onSelect={(date) => onFilterChange({ customStartDate: date })}
+                  defaultMonth={filterState.customStartDate}
                   initialFocus
                 />
               </PopoverContent>
@@ -91,7 +92,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {filterState.customEndDate ? format(filterState.customEndDate, "PPP") : <span>End date</span>}
+                  {filterState.customEndDate ? format(filterState.customEndDate, "dd/MM/yyyy") : <span>End date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -99,6 +100,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                   mode="single"
                   selected={filterState.customEndDate}
                   onSelect={(date) => onFilterChange({ customEndDate: date })}
+                  defaultMonth={filterState.customEndDate}
                   initialFocus
                 />
               </PopoverContent>
