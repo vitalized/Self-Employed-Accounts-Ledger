@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key } from "lucide-react";
+import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key, ChevronDown, ChevronUp, ExternalLink, Info } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useDataMode } from "@/lib/dataContext";
 
@@ -20,6 +20,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
 
   // Avoid hydration mismatch
   useEffect(() => {
@@ -136,6 +137,145 @@ export default function Settings() {
                        You can generate this in the <a href="https://developer.starlingbank.com/" target="_blank" rel="noreferrer" className="underline hover:text-primary">Starling Developer Portal</a>.
                     </p>
                  </div>
+
+                 <button
+                   onClick={() => setShowSetupGuide(!showSetupGuide)}
+                   className="flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors"
+                   data-testid="button-toggle-setup-guide"
+                 >
+                   {showSetupGuide ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                   {showSetupGuide ? "Hide Setup Guide" : "Show Setup Guide"}
+                 </button>
+
+                 {showSetupGuide && (
+                   <div className="space-y-6 rounded-lg border bg-white dark:bg-slate-950 p-4">
+                     <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-900">
+                       <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                       <div className="text-sm text-blue-800 dark:text-blue-200">
+                         <strong>Personal Access Tokens</strong> allow you to access your own Starling account data. 
+                         They don't expire and have a rate limit of 5 requests/second and 1,000 requests/day.
+                       </div>
+                     </div>
+
+                     <div className="space-y-4">
+                       <h5 className="font-semibold text-base">Getting Started</h5>
+                       
+                       <div className="space-y-3">
+                         <div className="flex gap-3">
+                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-300">1</div>
+                           <div className="space-y-1">
+                             <p className="font-medium text-sm">Create a Developer Portal Account</p>
+                             <p className="text-sm text-muted-foreground">
+                               Visit the <a href="https://developer.starlingbank.com/signup" target="_blank" rel="noreferrer" className="text-purple-600 underline hover:text-purple-700">Starling Developer Portal</a> and sign up for a developer account using your email address.
+                             </p>
+                           </div>
+                         </div>
+
+                         <div className="flex gap-3">
+                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-300">2</div>
+                           <div className="space-y-1">
+                             <p className="font-medium text-sm">Link Your Starling Bank Account</p>
+                             <p className="text-sm text-muted-foreground">
+                               In the Developer Portal, go to <strong>"Personal Access"</strong> in the left sidebar and click <strong>"Link Account"</strong>. 
+                               Log in with your Starling mobile app to authorise the connection.
+                             </p>
+                           </div>
+                         </div>
+
+                         <div className="flex gap-3">
+                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-300">3</div>
+                           <div className="space-y-1">
+                             <p className="font-medium text-sm">Create a Personal Access Token</p>
+                             <p className="text-sm text-muted-foreground">
+                               Once linked, click <strong>"Create Token"</strong>. Select these permissions:
+                             </p>
+                             <ul className="text-sm text-muted-foreground list-disc ml-4 mt-1 space-y-0.5">
+                               <li><code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">account:read</code> - View account details</li>
+                               <li><code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">balance:read</code> - View account balance</li>
+                               <li><code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">transaction:read</code> - View transactions</li>
+                             </ul>
+                           </div>
+                         </div>
+
+                         <div className="flex gap-3">
+                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-300">4</div>
+                           <div className="space-y-1">
+                             <p className="font-medium text-sm">Copy and Paste Your Token</p>
+                             <p className="text-sm text-muted-foreground">
+                               Copy the generated token (it starts with <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">eyJ...</code>) and paste it in the field above.
+                               <strong className="text-amber-600 dark:text-amber-400"> Save it securely - you won't be able to see it again!</strong>
+                             </p>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+
+                     <Separator />
+
+                     <div className="space-y-4">
+                       <h5 className="font-semibold text-base">Sandbox Testing (Optional)</h5>
+                       <p className="text-sm text-muted-foreground">
+                         If you want to test without using real money, you can use the Starling Sandbox:
+                       </p>
+                       <div className="space-y-3">
+                         <div className="flex gap-3">
+                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-400">1</div>
+                           <div className="space-y-1">
+                             <p className="font-medium text-sm">Register an Application</p>
+                             <p className="text-sm text-muted-foreground">
+                               In the Developer Portal, go to <strong>"My Applications"</strong> and click <strong>"Create Application"</strong>.
+                               Give it a name like "TaxTrack Testing".
+                             </p>
+                           </div>
+                         </div>
+
+                         <div className="flex gap-3">
+                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-400">2</div>
+                           <div className="space-y-1">
+                             <p className="font-medium text-sm">Use the Sandbox Simulator</p>
+                             <p className="text-sm text-muted-foreground">
+                               Go to <strong>"Sandbox"</strong> → <strong>"Sandbox Customers"</strong>. Create test customers and accounts, 
+                               then use the simulator to generate dummy transactions.
+                             </p>
+                           </div>
+                         </div>
+
+                         <div className="flex gap-3">
+                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-400">3</div>
+                           <div className="space-y-1">
+                             <p className="font-medium text-sm">Get Sandbox Access Token</p>
+                             <p className="text-sm text-muted-foreground">
+                               The sandbox uses a different API URL (<code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">api-sandbox.starlingbank.com</code>). 
+                               Generate a sandbox token from your application's sandbox settings.
+                             </p>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+
+                     <div className="flex items-center gap-2 pt-2">
+                       <a 
+                         href="https://developer.starlingbank.com/docs" 
+                         target="_blank" 
+                         rel="noreferrer"
+                         className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                       >
+                         <ExternalLink className="h-3.5 w-3.5" />
+                         Full API Documentation
+                       </a>
+                       <span className="text-muted-foreground">•</span>
+                       <a 
+                         href="https://developer.starlingbank.com/community" 
+                         target="_blank" 
+                         rel="noreferrer"
+                         className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                       >
+                         <ExternalLink className="h-3.5 w-3.5" />
+                         Developer Slack Community
+                       </a>
+                     </div>
+                   </div>
+                 )}
               </div>
             )}
           </CardContent>
