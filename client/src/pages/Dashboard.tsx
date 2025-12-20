@@ -9,11 +9,15 @@ import { FilterState, Transaction } from "@/lib/types";
 import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, useUpdateTransaction } from "@/lib/queries";
+import { useDataMode } from "@/lib/dataContext";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { data: transactions = [], isLoading } = useTransactions();
+  const { useMockData } = useDataMode();
+  const { data: apiTransactions = [], isLoading } = useTransactions();
   const updateTransactionMutation = useUpdateTransaction();
+  
+  const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
   
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'tax-year-current',
@@ -142,7 +146,7 @@ export default function Dashboard() {
     }, 1500);
   };
 
-  if (isLoading) {
+  if (isLoading && !useMockData) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-screen">

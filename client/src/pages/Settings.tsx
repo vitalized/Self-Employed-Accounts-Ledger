@@ -10,10 +10,12 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useDataMode } from "@/lib/dataContext";
 
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const { useMockData, setUseMockData } = useDataMode();
   const [starlingConnected, setStarlingConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState("");
@@ -205,7 +207,19 @@ export default function Settings() {
                      Use generated data for testing purposes
                   </p>
                </div>
-               <Switch defaultChecked disabled />
+               <Switch 
+                 checked={useMockData} 
+                 onCheckedChange={(checked) => {
+                   setUseMockData(checked);
+                   toast({
+                     title: checked ? "Mock Data Enabled" : "Mock Data Disabled",
+                     description: checked 
+                       ? "Using generated sample data for testing." 
+                       : "Using real database transactions.",
+                   });
+                 }}
+                 data-testid="switch-mock-data"
+               />
             </div>
 
           </CardContent>

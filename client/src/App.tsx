@@ -3,6 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/theme-provider";
+import { DataProvider } from "@/lib/dataContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Reports from "@/pages/Reports";
@@ -15,22 +17,21 @@ function Router() {
       <Route path="/transactions" component={Dashboard} />
       <Route path="/reports" component={Reports} />
       <Route path="/settings" component={Settings} />
-      {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-import { ThemeProvider } from "@/components/theme-provider";
-
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme" attribute="class">
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <DataProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </DataProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

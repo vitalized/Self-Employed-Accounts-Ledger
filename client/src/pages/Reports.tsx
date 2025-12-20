@@ -8,10 +8,14 @@ import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInte
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { TaxSummary } from "@/components/reports/TaxSummary";
 import { useTransactions } from "@/lib/queries";
+import { useDataMode } from "@/lib/dataContext";
 
 export default function Reports() {
   const [dateRange, setDateRange] = useState('tax-year-current');
-  const { data: transactions = [], isLoading } = useTransactions();
+  const { useMockData } = useDataMode();
+  const { data: apiTransactions = [], isLoading } = useTransactions();
+  
+  const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
 
   // Helper to get date range object
   const getFilterDateRange = (filter: string) => {
@@ -141,7 +145,7 @@ export default function Reports() {
      return Object.keys(months).sort().map(k => months[k]);
   }, [filteredTransactions]);
 
-  if (isLoading) {
+  if (isLoading && !useMockData) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-screen">
