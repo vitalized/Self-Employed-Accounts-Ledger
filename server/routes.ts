@@ -3,9 +3,55 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateTransactionSchema } from "@shared/schema";
 import { z } from "zod";
+import crypto from "crypto";
 
 const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
 const STARLING_SANDBOX_API_BASE = "https://api-sandbox.starlingbank.com/api/v2";
+
+// Token encryption for secure storage
+const ALGORITHM = "aes-256-cbc";
+
+function getEncryptionKey(): Buffer {
+  // Use environment variable for the encryption key
+  // In production, this should be a strong randomly generated key stored securely
+  const secret = process.env.STARLING_ENCRYPTION_KEY || process.env.SESSION_SECRET;
+  if (!secret) {
+    console.warn("Warning: No encryption key configured. Using derived key from DATABASE_URL.");
+  }
+  // Derive a 32-byte key from available secret or DATABASE_URL
+  const baseSecret = secret || process.env.DATABASE_URL || "taxtrack-dev-mode";
+  return crypto.scryptSync(baseSecret, crypto.createHash('sha256').update(baseSecret).digest(), 32);
+}
+
+function encrypt(text: string): string {
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return iv.toString('hex') + ':' + encrypted;
+}
+
+function decrypt(encryptedText: string): string {
+  try {
+    const key = getEncryptionKey();
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      // Handle legacy unencrypted tokens
+      return encryptedText;
+    }
+    const iv = Buffer.from(parts[0], 'hex');
+    const encrypted = parts[1];
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (error) {
+    // If decryption fails, assume it's a legacy unencrypted token
+    console.warn("Token decryption failed, treating as legacy token");
+    return encryptedText;
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -180,10 +226,11 @@ export async function registerRoutes(
       const sandboxSetting = await storage.getSetting("starling_sandbox");
       const apiBase = sandboxSetting?.value === "true" ? STARLING_SANDBOX_API_BASE : STARLING_API_BASE;
       
-      // Verify token is still valid by making a test API call
+      // Decrypt and verify token is still valid by making a test API call
+      const decryptedToken = decrypt(tokenSetting.value);
       const response = await fetch(`${apiBase}/accounts`, {
         headers: {
-          "Authorization": `Bearer ${tokenSetting.value}`,
+          "Authorization": `Bearer ${decryptedToken}`,
           "Accept": "application/json"
         }
       });
@@ -243,8 +290,8 @@ export async function registerRoutes(
 
       const accountsData = await response.json();
       
-      // Save the token securely
-      await storage.setSetting("starling_token", token);
+      // Save the token securely (encrypted)
+      await storage.setSetting("starling_token", encrypt(token));
       await storage.setSetting("starling_sandbox", useSandbox ? "true" : "false");
 
       res.json({ 
@@ -281,7 +328,7 @@ export async function registerRoutes(
       }
 
       const apiBase = sandboxSetting?.value === "true" ? STARLING_SANDBOX_API_BASE : STARLING_API_BASE;
-      const token = tokenSetting.value;
+      const token = decrypt(tokenSetting.value);
 
       // Get accounts
       const accountsRes = await fetch(`${apiBase}/accounts`, {
