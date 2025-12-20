@@ -155,7 +155,7 @@ export default function Dashboard() {
 
         <div>
            <div className="flex items-center justify-between py-4">
-             <h3 className="text-xl font-semibold">Recent Transactions</h3>
+             <h3 className="text-xl font-semibold">Transactions</h3>
              <div className="text-sm text-muted-foreground">
                {filteredTransactions.length} transactions found
              </div>
