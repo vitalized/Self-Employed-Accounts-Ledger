@@ -67,3 +67,21 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
 
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type Settings = typeof settings.$inferSelect;
+
+// Categorization rules for auto-assigning transaction types and categories
+export const categorizationRules = pgTable("categorization_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  keyword: text("keyword").notNull(),
+  type: text("type").notNull(), // Business, Personal
+  businessType: text("business_type"), // Income, Expense (for Business type)
+  category: text("category"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCategorizationRuleSchema = createInsertSchema(categorizationRules).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCategorizationRule = z.infer<typeof insertCategorizationRuleSchema>;
+export type CategorizationRule = typeof categorizationRules.$inferSelect;

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateTransactionSchema } from "@shared/schema";
+import { insertTransactionSchema, updateTransactionSchema, insertCategorizationRuleSchema } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -212,6 +212,97 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Categorization Rules API endpoints =====
+
+  // Get all rules
+  app.get("/api/rules", async (req, res) => {
+    try {
+      const rules = await storage.getRules();
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching rules:", error);
+      res.status(500).json({ error: "Failed to fetch rules" });
+    }
+  });
+
+  // Create rule
+  app.post("/api/rules", async (req, res) => {
+    try {
+      const validatedData = insertCategorizationRuleSchema.parse(req.body);
+      const rule = await storage.createRule(validatedData);
+      res.status(201).json(rule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid rule data", details: error.errors });
+      }
+      console.error("Error creating rule:", error);
+      res.status(500).json({ error: "Failed to create rule" });
+    }
+  });
+
+  // Update rule
+  app.patch("/api/rules/:id", async (req, res) => {
+    try {
+      const validatedData = insertCategorizationRuleSchema.partial().parse(req.body);
+      const rule = await storage.updateRule(req.params.id, validatedData);
+      if (!rule) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      res.json(rule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid rule data", details: error.errors });
+      }
+      console.error("Error updating rule:", error);
+      res.status(500).json({ error: "Failed to update rule" });
+    }
+  });
+
+  // Delete rule
+  app.delete("/api/rules/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteRule(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting rule:", error);
+      res.status(500).json({ error: "Failed to delete rule" });
+    }
+  });
+
+  // Apply all rules to existing transactions
+  app.post("/api/rules/apply-all", async (req, res) => {
+    try {
+      const allTransactions = await storage.getTransactions();
+      const rules = await storage.getRules();
+      
+      let updated = 0;
+      
+      for (const transaction of allTransactions) {
+        const match = await storage.applyRulesToTransaction(transaction);
+        if (match) {
+          await storage.updateTransaction(transaction.id, {
+            type: match.type,
+            businessType: match.businessType,
+            category: match.category,
+          });
+          updated++;
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        updated,
+        message: `Applied rules to ${updated} transactions`
+      });
+    } catch (error) {
+      console.error("Error applying rules:", error);
+      res.status(500).json({ error: "Failed to apply rules" });
+    }
+  });
+
   // ===== Starling Bank API endpoints =====
 
   // Check Starling connection status
@@ -396,8 +487,33 @@ export async function registerRoutes(
             ? item.amount.minorUnits / 100 
             : -(item.amount.minorUnits / 100);
 
-          // Auto-assign income as Business, expenses as Unreviewed
-          const transactionType = isIncoming ? "Business" : "Unreviewed";
+          // Default values
+          let transactionType = isIncoming ? "Business" : "Unreviewed";
+          let category = isIncoming ? "Sales" : null;
+          let businessType: string | null = isIncoming ? "Income" : "Expense";
+
+          // Check if any rules match this transaction
+          const tempTransaction = {
+            id: "",
+            userId: null,
+            date: new Date(item.transactionTime),
+            description: item.counterPartyName || item.reference || "Unknown",
+            amount: String(amount),
+            merchant: item.counterPartyName || "Unknown",
+            type: transactionType,
+            category,
+            businessType,
+            status: "Cleared",
+            tags: [],
+            createdAt: new Date(),
+          };
+          
+          const ruleMatch = await storage.applyRulesToTransaction(tempTransaction);
+          if (ruleMatch) {
+            transactionType = ruleMatch.type;
+            businessType = ruleMatch.businessType;
+            category = ruleMatch.category;
+          }
 
           await storage.createTransaction({
             userId: null,
@@ -406,8 +522,8 @@ export async function registerRoutes(
             amount: String(amount),
             merchant: item.counterPartyName || "Unknown",
             type: transactionType,
-            category: isIncoming ? "Sales" : null,
-            businessType: isIncoming ? "Income" : "Expense",
+            category,
+            businessType,
             status: item.status === "SETTLED" ? "Cleared" : "Pending",
             tags: [`starling:${feedItemUid}`],
           });

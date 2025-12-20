@@ -8,20 +8,175 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key, ChevronDown, ChevronUp, ExternalLink, Info } from "lucide-react";
+import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, X, Play, ListFilter, Pencil, Check } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useDataMode } from "@/lib/dataContext";
+import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
+import { useQueryClient } from "@tanstack/react-query";
+
+interface CategorizationRule {
+  id: string;
+  keyword: string;
+  type: string;
+  businessType: string | null;
+  category: string | null;
+  createdAt: string;
+}
 
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const { useMockData, setUseMockData } = useDataMode();
+  const queryClient = useQueryClient();
   const [starlingConnected, setStarlingConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [token, setToken] = useState("");
   const [mounted, setMounted] = useState(false);
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+
+  // Rules state
+  const [rules, setRules] = useState<CategorizationRule[]>([]);
+  const [loadingRules, setLoadingRules] = useState(true);
+  const [applyingRules, setApplyingRules] = useState(false);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [newRule, setNewRule] = useState({
+    keyword: "",
+    type: "Personal",
+    businessType: null as string | null,
+    category: null as string | null,
+  });
+  const [editRule, setEditRule] = useState({
+    keyword: "",
+    type: "Personal",
+    businessType: null as string | null,
+    category: null as string | null,
+  });
+
+  // Fetch rules on mount
+  useEffect(() => {
+    fetchRules();
+  }, []);
+
+  const fetchRules = async () => {
+    try {
+      const response = await fetch("/api/rules");
+      if (response.ok) {
+        const data = await response.json();
+        setRules(data);
+      }
+    } catch (error) {
+      console.error("Error fetching rules:", error);
+    } finally {
+      setLoadingRules(false);
+    }
+  };
+
+  const handleAddRule = async () => {
+    if (!newRule.keyword.trim()) {
+      toast({
+        title: "Keyword Required",
+        description: "Please enter a keyword to match.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newRule)
+      });
+
+      if (response.ok) {
+        const created = await response.json();
+        setRules([created, ...rules]);
+        setNewRule({ keyword: "", type: "Personal", businessType: null, category: null });
+        toast({
+          title: "Rule Created",
+          description: `Transactions containing "${created.keyword}" will be categorized automatically.`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create rule.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteRule = async (id: string) => {
+    try {
+      const response = await fetch(`/api/rules/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        setRules(rules.filter(r => r.id !== id));
+        toast({ title: "Rule Deleted" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete rule.", variant: "destructive" });
+    }
+  };
+
+  const handleStartEdit = (rule: CategorizationRule) => {
+    setEditingRuleId(rule.id);
+    setEditRule({
+      keyword: rule.keyword,
+      type: rule.type,
+      businessType: rule.businessType,
+      category: rule.category,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRuleId(null);
+    setEditRule({ keyword: "", type: "Personal", businessType: null, category: null });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingRuleId || !editRule.keyword.trim()) {
+      toast({ title: "Keyword Required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/rules/${editingRuleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editRule)
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        setRules(rules.map(r => r.id === editingRuleId ? updated : r));
+        setEditingRuleId(null);
+        setEditRule({ keyword: "", type: "Personal", businessType: null, category: null });
+        toast({ title: "Rule Updated" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update rule.", variant: "destructive" });
+    }
+  };
+
+  const handleApplyAllRules = async () => {
+    setApplyingRules(true);
+    try {
+      const response = await fetch("/api/rules/apply-all", { method: "POST" });
+      const data = await response.json();
+      if (response.ok) {
+        toast({
+          title: "Rules Applied",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to apply rules.", variant: "destructive" });
+    } finally {
+      setApplyingRules(false);
+    }
+  };
 
   // Check Starling connection status on mount
   useEffect(() => {
@@ -414,6 +569,254 @@ export default function Settings() {
                />
             </div>
 
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <ListFilter className="h-5 w-5 text-blue-600" />
+              <CardTitle>Auto-Categorization Rules</CardTitle>
+            </div>
+            <CardDescription>
+              Create rules to automatically categorize transactions based on keywords in the transaction name.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4 border rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+              <h4 className="font-medium text-sm">Add New Rule</h4>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-2">
+                  <Label htmlFor="keyword">Contains keyword</Label>
+                  <Input
+                    id="keyword"
+                    placeholder="e.g. Amazon, Tesco"
+                    value={newRule.keyword}
+                    onChange={(e) => setNewRule({ ...newRule, keyword: e.target.value })}
+                    data-testid="input-rule-keyword"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Transaction Type</Label>
+                  <Select
+                    value={newRule.type}
+                    onValueChange={(value) => setNewRule({ 
+                      ...newRule, 
+                      type: value,
+                      businessType: value === "Business" ? "Expense" : null,
+                      category: null 
+                    })}
+                  >
+                    <SelectTrigger data-testid="select-rule-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Personal">Personal</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newRule.type === "Business" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Business Type</Label>
+                      <Select
+                        value={newRule.businessType || "Expense"}
+                        onValueChange={(value) => setNewRule({ ...newRule, businessType: value, category: null })}
+                      >
+                        <SelectTrigger data-testid="select-rule-business-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Income">Income</SelectItem>
+                          <SelectItem value="Expense">Expense</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select
+                        value={newRule.category || ""}
+                        onValueChange={(value) => setNewRule({ ...newRule, category: value })}
+                      >
+                        <SelectTrigger data-testid="select-rule-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {newRule.businessType === "Income" ? (
+                            INCOME_CATEGORIES.map((cat) => (
+                              <SelectItem key={cat.code} value={cat.label}>{cat.label}</SelectItem>
+                            ))
+                          ) : (
+                            SA103_EXPENSE_CATEGORIES.map((cat) => (
+                              <SelectItem key={cat.code} value={cat.label}>{cat.label}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+              <Button onClick={handleAddRule} className="mt-2" data-testid="button-add-rule">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Rule
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Existing Rules ({rules.length})</h4>
+                {rules.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleApplyAllRules}
+                    disabled={applyingRules}
+                    data-testid="button-apply-all-rules"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {applyingRules ? "Applying..." : "Apply All Rules to Existing Transactions"}
+                  </Button>
+                )}
+              </div>
+              
+              {loadingRules ? (
+                <p className="text-sm text-muted-foreground">Loading rules...</p>
+              ) : rules.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No rules created yet. Add a rule above to get started.</p>
+              ) : (
+                <div className="space-y-2">
+                  {rules.map((rule) => (
+                    <div 
+                      key={rule.id} 
+                      className="p-3 border rounded-md bg-white dark:bg-slate-950"
+                      data-testid={`rule-item-${rule.id}`}
+                    >
+                      {editingRuleId === rule.id ? (
+                        <div className="space-y-3">
+                          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                            <Input
+                              value={editRule.keyword}
+                              onChange={(e) => setEditRule({ ...editRule, keyword: e.target.value })}
+                              placeholder="Keyword"
+                              data-testid={`input-edit-keyword-${rule.id}`}
+                            />
+                            <Select
+                              value={editRule.type}
+                              onValueChange={(value) => setEditRule({ 
+                                ...editRule, 
+                                type: value,
+                                businessType: value === "Business" ? "Expense" : null,
+                                category: null 
+                              })}
+                            >
+                              <SelectTrigger data-testid={`select-edit-type-${rule.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Personal">Personal</SelectItem>
+                                <SelectItem value="Business">Business</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {editRule.type === "Business" && (
+                              <>
+                                <Select
+                                  value={editRule.businessType || "Expense"}
+                                  onValueChange={(value) => setEditRule({ ...editRule, businessType: value, category: null })}
+                                >
+                                  <SelectTrigger data-testid={`select-edit-business-type-${rule.id}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Income">Income</SelectItem>
+                                    <SelectItem value="Expense">Expense</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={editRule.category || ""}
+                                  onValueChange={(value) => setEditRule({ ...editRule, category: value })}
+                                >
+                                  <SelectTrigger data-testid={`select-edit-category-${rule.id}`}>
+                                    <SelectValue placeholder="Category" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {editRule.businessType === "Income" ? (
+                                      INCOME_CATEGORIES.map((cat) => (
+                                        <SelectItem key={cat.code} value={cat.label}>{cat.label}</SelectItem>
+                                      ))
+                                    ) : (
+                                      SA103_EXPENSE_CATEGORIES.map((cat) => (
+                                        <SelectItem key={cat.code} value={cat.label}>{cat.label}</SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleSaveEdit} data-testid={`button-save-rule-${rule.id}`}>
+                              <Check className="mr-1 h-3 w-3" />
+                              Save
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEdit} data-testid={`button-cancel-edit-${rule.id}`}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                              "{rule.keyword}"
+                            </span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className={`font-medium ${rule.type === 'Business' ? 'text-blue-600' : 'text-gray-600'}`}>
+                              {rule.type}
+                            </span>
+                            {rule.type === "Business" && (
+                              <>
+                                <span className="text-muted-foreground">•</span>
+                                <span className={rule.businessType === 'Income' ? 'text-green-600' : 'text-red-600'}>
+                                  {rule.businessType}
+                                </span>
+                                {rule.category && (
+                                  <>
+                                    <span className="text-muted-foreground">•</span>
+                                    <span className="text-purple-600">{rule.category}</span>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleStartEdit(rule)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              data-testid={`button-edit-rule-${rule.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteRule(rule.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              data-testid={`button-delete-rule-${rule.id}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

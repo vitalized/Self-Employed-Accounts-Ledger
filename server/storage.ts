@@ -1,6 +1,6 @@
-import { users, transactions, settings, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings } from "@shared/schema";
+import { users, transactions, settings, categorizationRules, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -19,6 +19,14 @@ export interface IStorage {
   getSetting(key: string): Promise<Settings | undefined>;
   setSetting(key: string, value: string): Promise<Settings>;
   deleteSetting(key: string): Promise<boolean>;
+  
+  // Categorization rules methods
+  getRules(): Promise<CategorizationRule[]>;
+  getRule(id: string): Promise<CategorizationRule | undefined>;
+  createRule(rule: InsertCategorizationRule): Promise<CategorizationRule>;
+  updateRule(id: string, updates: Partial<InsertCategorizationRule>): Promise<CategorizationRule | undefined>;
+  deleteRule(id: string): Promise<boolean>;
+  applyRulesToTransaction(transaction: Transaction): Promise<{ type: string; businessType: string | null; category: string | null } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -128,6 +136,63 @@ export class DatabaseStorage implements IStorage {
       .where(eq(settings.key, key))
       .returning();
     return result.length > 0;
+  }
+
+  // Categorization rules methods
+  async getRules(): Promise<CategorizationRule[]> {
+    return await db.select()
+      .from(categorizationRules)
+      .orderBy(desc(categorizationRules.createdAt));
+  }
+
+  async getRule(id: string): Promise<CategorizationRule | undefined> {
+    const [rule] = await db.select()
+      .from(categorizationRules)
+      .where(eq(categorizationRules.id, id));
+    return rule || undefined;
+  }
+
+  async createRule(insertRule: InsertCategorizationRule): Promise<CategorizationRule> {
+    const [rule] = await db
+      .insert(categorizationRules)
+      .values(insertRule)
+      .returning();
+    return rule;
+  }
+
+  async updateRule(id: string, updates: Partial<InsertCategorizationRule>): Promise<CategorizationRule | undefined> {
+    const [rule] = await db
+      .update(categorizationRules)
+      .set(updates)
+      .where(eq(categorizationRules.id, id))
+      .returning();
+    return rule || undefined;
+  }
+
+  async deleteRule(id: string): Promise<boolean> {
+    const result = await db
+      .delete(categorizationRules)
+      .where(eq(categorizationRules.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async applyRulesToTransaction(transaction: Transaction): Promise<{ type: string; businessType: string | null; category: string | null } | null> {
+    const rules = await this.getRules();
+    const description = transaction.description.toLowerCase();
+    const merchant = transaction.merchant.toLowerCase();
+    
+    for (const rule of rules) {
+      const keyword = rule.keyword.toLowerCase();
+      if (description.includes(keyword) || merchant.includes(keyword)) {
+        return {
+          type: rule.type,
+          businessType: rule.businessType,
+          category: rule.category,
+        };
+      }
+    }
+    return null;
   }
 }
 

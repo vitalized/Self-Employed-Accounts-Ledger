@@ -113,7 +113,33 @@ async function syncStarlingTransactions(): Promise<void> {
           ? item.amount.minorUnits / 100 
           : -(item.amount.minorUnits / 100);
 
-        const transactionType = isIncoming ? "Business" : "Unreviewed";
+        // Default values
+        let transactionType = isIncoming ? "Business" : "Unreviewed";
+        let category = isIncoming ? "Sales" : null;
+        let businessType: string | null = isIncoming ? "Income" : "Expense";
+
+        // Check if any rules match this transaction
+        const tempTransaction = {
+          id: "",
+          userId: null,
+          date: new Date(item.transactionTime),
+          description: item.counterPartyName || item.reference || "Unknown",
+          amount: String(amount),
+          merchant: item.counterPartyName || "Unknown",
+          type: transactionType,
+          category,
+          businessType,
+          status: "Cleared" as const,
+          tags: [] as string[],
+          createdAt: new Date(),
+        };
+        
+        const ruleMatch = await storage.applyRulesToTransaction(tempTransaction);
+        if (ruleMatch) {
+          transactionType = ruleMatch.type;
+          businessType = ruleMatch.businessType;
+          category = ruleMatch.category;
+        }
 
         await storage.createTransaction({
           userId: null,
@@ -122,8 +148,8 @@ async function syncStarlingTransactions(): Promise<void> {
           amount: String(amount),
           merchant: item.counterPartyName || "Unknown",
           type: transactionType,
-          category: isIncoming ? "Sales" : null,
-          businessType: isIncoming ? "Income" : "Expense",
+          category,
+          businessType,
           status: item.status === "SETTLED" ? "Cleared" : "Pending",
           tags: [`starling:${feedItemUid}`],
         });
