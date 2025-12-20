@@ -40,6 +40,14 @@ const calculateUKTax = (profit: number) => {
   return tax;
 };
 
+const formatDateLabel = (label: string) => {
+  if (!label) return '';
+  return label
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   // Calculate totals
   const businessIncome = transactions
@@ -63,7 +71,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         <CardContent>
           <div className="text-2xl font-bold">£{profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           <p className="text-xs text-muted-foreground">
-            {dateLabel}
+            {formatDateLabel(dateLabel)}
           </p>
         </CardContent>
       </Card>
