@@ -396,14 +396,17 @@ export async function registerRoutes(
             ? item.amount.minorUnits / 100 
             : -(item.amount.minorUnits / 100);
 
+          // Auto-assign income as Business, expenses as Unreviewed
+          const transactionType = isIncoming ? "Business" : "Unreviewed";
+
           await storage.createTransaction({
             userId: null,
             date: new Date(item.transactionTime),
             description: item.counterPartyName || item.reference || "Unknown",
             amount: String(amount),
             merchant: item.counterPartyName || "Unknown",
-            type: "Unreviewed",
-            category: null,
+            type: transactionType,
+            category: isIncoming ? "Sales" : null,
             businessType: isIncoming ? "Income" : "Expense",
             status: item.status === "SETTLED" ? "Cleared" : "Pending",
             tags: [`starling:${feedItemUid}`],
