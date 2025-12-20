@@ -6,6 +6,7 @@ import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { Transaction } from "@/lib/types";
 import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { TaxSummary } from "@/components/reports/TaxSummary";
 
 export default function Reports() {
   const [dateRange, setDateRange] = useState('tax-year-current');
@@ -34,6 +35,12 @@ export default function Reports() {
       default:
         return { start: new Date(2025, 3, 1), end: new Date(2026, 2, 31) };
     }
+  };
+
+  const getYearLabel = (filter: string) => {
+     if (filter === 'tax-year-current') return '2025-26';
+     if (filter === 'tax-year-previous') return '2024-25';
+     return '2025-26'; // Fallback
   };
 
   const currentRange = getFilterDateRange(dateRange);
@@ -256,39 +263,7 @@ export default function Reports() {
           </Card>
         </div>
         
-        <Card>
-            <CardHeader>
-              <CardTitle>Profit & Loss Statement</CardTitle>
-              <CardDescription>Detailed financial statement</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                        <div className="font-semibold">Revenue</div>
-                        <div className="text-right font-semibold">£{financials.income.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                        <div className="font-medium text-muted-foreground">Operating Expenses</div>
-                        {expenseData.map((item) => (
-                             <div key={item.name} className="grid grid-cols-2 gap-4 pl-4 text-sm">
-                                <div>{item.name}</div>
-                                <div className="text-right text-red-500">-£{item.value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
-                             </div>
-                        ))}
-                        <div className="grid grid-cols-2 gap-4 border-t pt-2 font-medium">
-                            <div>Total Expenses</div>
-                            <div className="text-right text-red-600">-£{financials.expenses.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 border-t border-slate-200 dark:border-slate-800 pt-4 text-lg font-bold">
-                        <div>Net Profit</div>
-                        <div className="text-right">£{financials.netProfit.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
+        <TaxSummary transactions={filteredTransactions} yearLabel={getYearLabel(dateRange)} />
 
       </div>
     </DashboardLayout>
