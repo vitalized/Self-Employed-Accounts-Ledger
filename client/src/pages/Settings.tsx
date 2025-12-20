@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function Settings() {
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [starlingConnected, setStarlingConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  // Avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleConnectStarling = () => {
     if (!token) {
@@ -181,7 +189,11 @@ export default function Settings() {
                      Toggle application theme
                   </p>
                </div>
-               <Switch />
+               <Switch 
+                  checked={mounted && theme === "dark"}
+                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                  disabled={!mounted}
+               />
             </div>
             
             <Separator />
