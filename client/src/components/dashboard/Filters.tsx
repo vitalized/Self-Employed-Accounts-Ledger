@@ -8,7 +8,11 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { DateFilter, FilterState } from "@/lib/types";
-import { Search, Download, RefreshCw } from "lucide-react";
+import { Search, Download, RefreshCw, CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface FiltersProps {
   filterState: FilterState;
@@ -49,6 +53,58 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
             <SelectItem value="custom">Custom Date</SelectItem>
           </SelectContent>
         </Select>
+
+        {filterState.dateRange === 'custom' && (
+          <div className="flex items-center space-x-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-[140px] justify-start text-left font-normal",
+                    !filterState.customStartDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {filterState.customStartDate ? format(filterState.customStartDate, "PPP") : <span>Start date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={filterState.customStartDate}
+                  onSelect={(date) => onFilterChange({ customStartDate: date })}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            <span className="text-muted-foreground">-</span>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-[140px] justify-start text-left font-normal",
+                    !filterState.customEndDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {filterState.customEndDate ? format(filterState.customEndDate, "PPP") : <span>End date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={filterState.customEndDate}
+                  onSelect={(date) => onFilterChange({ customEndDate: date })}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
 
         <Select 
           value={filterState.type || "All"} 

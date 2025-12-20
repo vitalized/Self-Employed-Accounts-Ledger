@@ -48,6 +48,11 @@ export default function Dashboard() {
         return { start: new Date(2025, 3, 1), end: new Date(2026, 2, 31) };
       case 'tax-year-previous':
         return { start: new Date(2024, 3, 1), end: new Date(2025, 2, 31) };
+      case 'custom':
+        return { 
+          start: filters.customStartDate || startOfMonth(now), 
+          end: filters.customEndDate || now 
+        };
       default:
         return { start: new Date(2025, 0, 1), end: now };
     }
