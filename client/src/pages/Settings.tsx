@@ -18,16 +18,31 @@ export default function Settings() {
   const { useMockData, setUseMockData } = useDataMode();
   const [starlingConnected, setStarlingConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
   const [token, setToken] = useState("");
   const [mounted, setMounted] = useState(false);
   const [showSetupGuide, setShowSetupGuide] = useState(false);
 
-  // Avoid hydration mismatch
+  // Check Starling connection status on mount
   useEffect(() => {
     setMounted(true);
+    checkStarlingStatus();
   }, []);
 
-  const handleConnectStarling = () => {
+  const checkStarlingStatus = async () => {
+    try {
+      setCheckingStatus(true);
+      const response = await fetch("/api/starling/status");
+      const data = await response.json();
+      setStarlingConnected(data.connected);
+    } catch (error) {
+      console.error("Error checking Starling status:", error);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const handleConnectStarling = async () => {
     if (!token) {
       toast({
         title: "Access Token Required",
@@ -38,24 +53,61 @@ export default function Settings() {
     }
 
     setLoading(true);
-    // Simulate API connection delay
-    setTimeout(() => {
-      setLoading(false);
-      setStarlingConnected(true);
-      toast({
-        title: "Starling Bank Connected",
-        description: "Successfully authenticated with Starling Bank API.",
+    try {
+      const response = await fetch("/api/starling/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, useSandbox: false })
       });
-    }, 1500);
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setStarlingConnected(true);
+        setToken("");
+        toast({
+          title: "Starling Bank Connected",
+          description: data.message || "Successfully authenticated with Starling Bank API.",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: data.message || "Could not connect to Starling Bank. Please check your token.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect to Starling Bank. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDisconnectStarling = () => {
-    setStarlingConnected(false);
-    setToken("");
-    toast({
-      title: "Disconnected",
-      description: "Starling Bank account has been disconnected.",
-    });
+  const handleDisconnectStarling = async () => {
+    try {
+      const response = await fetch("/api/starling/disconnect", {
+        method: "POST"
+      });
+      
+      if (response.ok) {
+        setStarlingConnected(false);
+        setToken("");
+        toast({
+          title: "Disconnected",
+          description: "Starling Bank account has been disconnected.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to disconnect. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

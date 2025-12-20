@@ -176,8 +176,12 @@ export async function registerRoutes(
         return res.json({ connected: false });
       }
       
+      // Use the correct API based on sandbox setting
+      const sandboxSetting = await storage.getSetting("starling_sandbox");
+      const apiBase = sandboxSetting?.value === "true" ? STARLING_SANDBOX_API_BASE : STARLING_API_BASE;
+      
       // Verify token is still valid by making a test API call
-      const response = await fetch(`${STARLING_API_BASE}/accounts`, {
+      const response = await fetch(`${apiBase}/accounts`, {
         headers: {
           "Authorization": `Bearer ${tokenSetting.value}`,
           "Accept": "application/json"
@@ -188,16 +192,24 @@ export async function registerRoutes(
         const data = await response.json();
         res.json({ 
           connected: true, 
-          accountCount: data.accounts?.length || 0
+          accountCount: data.accounts?.length || 0,
+          isSandbox: sandboxSetting?.value === "true"
         });
       } else {
-        // Token is invalid, remove it
-        await storage.deleteSetting("starling_token");
-        res.json({ connected: false, reason: "Token expired or invalid" });
+        // Only remove token on 401 Unauthorized (token truly invalid)
+        if (response.status === 401) {
+          await storage.deleteSetting("starling_token");
+          await storage.deleteSetting("starling_sandbox");
+          res.json({ connected: false, reason: "Token expired or invalid" });
+        } else {
+          // Temporary error, don't delete token
+          res.json({ connected: true, reason: "Temporary API error" });
+        }
       }
     } catch (error) {
       console.error("Error checking Starling status:", error);
-      res.json({ connected: false, reason: "Connection error" });
+      // Network error - don't delete token, assume still connected
+      res.json({ connected: true, reason: "Connection check failed" });
     }
   });
 
@@ -318,11 +330,15 @@ export async function registerRoutes(
         const feedData = await transactionsRes.json();
         const feedItems = feedData.feedItems || [];
 
+        // Get all existing transactions once for this sync
+        const existingTransactions = await storage.getTransactions();
+        
         for (const item of feedItems) {
-          // Check if we already have this transaction (by reference)
-          const existingTransactions = await storage.getTransactions();
+          const feedItemUid = item.feedItemUid;
+          
+          // Check if we already have this transaction using full feedItemUid stored in tags
           const alreadyExists = existingTransactions.some(
-            t => t.description.includes(item.feedItemUid)
+            t => t.tags?.includes(`starling:${feedItemUid}`)
           );
           
           if (alreadyExists) continue;
@@ -336,14 +352,14 @@ export async function registerRoutes(
           await storage.createTransaction({
             userId: null,
             date: new Date(item.transactionTime),
-            description: `${item.counterPartyName || item.reference || "Unknown"} [${item.feedItemUid.slice(0, 8)}]`,
+            description: item.counterPartyName || item.reference || "Unknown",
             amount: String(amount),
             merchant: item.counterPartyName || "Unknown",
             type: "Unreviewed",
             category: null,
             businessType: isIncoming ? "Income" : "Expense",
             status: item.status === "SETTLED" ? "Cleared" : "Pending",
-            tags: [],
+            tags: [`starling:${feedItemUid}`],
           });
 
           totalImported++;
