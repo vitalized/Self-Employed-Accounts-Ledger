@@ -24,8 +24,8 @@ interface FiltersProps {
 
 export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories }: FiltersProps) {
   return (
-    <div className="mb-6 flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-      <div className="flex flex-1 items-center space-x-2">
+    <div className="mb-6 flex flex-col space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -55,7 +55,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
         </Select>
 
         {filterState.dateRange === 'custom' && (
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -141,7 +141,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
         </Select>
       </div>
 
-      <div className="flex items-center space-x-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" onClick={onRefresh}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Sync Bank
