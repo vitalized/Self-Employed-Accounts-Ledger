@@ -232,6 +232,7 @@ export default function Dashboard() {
            <TransactionList 
              transactions={filteredTransactions} 
              onUpdateTransaction={handleTransactionUpdate}
+             onRefresh={refetch}
            />
         </div>
       </div>

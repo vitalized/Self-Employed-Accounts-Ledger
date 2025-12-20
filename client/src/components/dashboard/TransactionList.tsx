@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Wand2 } from "lucide-react";
@@ -44,9 +45,10 @@ interface CategorizationRule {
 interface TransactionListProps {
   transactions: Transaction[];
   onUpdateTransaction: (id: string, updates: Partial<Transaction>) => void;
+  onRefresh?: () => void;
 }
 
-export function TransactionList({ transactions, onUpdateTransaction }: TransactionListProps) {
+export function TransactionList({ transactions, onUpdateTransaction, onRefresh }: TransactionListProps) {
   const { toast } = useToast();
   const [rules, setRules] = useState<CategorizationRule[]>([]);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
@@ -58,6 +60,7 @@ export function TransactionList({ transactions, onUpdateTransaction }: Transacti
     transactionId: string;
   } | null>(null);
   const [existingRule, setExistingRule] = useState<CategorizationRule | null>(null);
+  const [applyToPast, setApplyToPast] = useState(true);
 
   useEffect(() => {
     fetchRules();
@@ -132,6 +135,8 @@ export function TransactionList({ transactions, onUpdateTransaction }: Transacti
     if (!pendingRule) return;
 
     try {
+      let saveSucceeded = false;
+      
       if (existingRule) {
         const response = await fetch(`/api/rules/${existingRule.id}`, {
           method: "PATCH",
@@ -144,8 +149,11 @@ export function TransactionList({ transactions, onUpdateTransaction }: Transacti
           })
         });
         if (response.ok) {
+          saveSucceeded = true;
           toast({ title: "Rule Updated", description: `Rule for "${pendingRule.keyword}" has been updated.` });
           fetchRules();
+        } else {
+          toast({ title: "Error", description: "Failed to update rule.", variant: "destructive" });
         }
       } else {
         const response = await fetch("/api/rules", {
@@ -159,8 +167,30 @@ export function TransactionList({ transactions, onUpdateTransaction }: Transacti
           })
         });
         if (response.ok) {
+          saveSucceeded = true;
           toast({ title: "Rule Created", description: `Future "${pendingRule.keyword}" transactions will be auto-categorized.` });
           fetchRules();
+        } else {
+          toast({ title: "Error", description: "Failed to create rule.", variant: "destructive" });
+        }
+      }
+      
+      // Apply to past transactions if checkbox is checked and save succeeded
+      if (applyToPast && saveSucceeded) {
+        try {
+          const applyResponse = await fetch("/api/rules/apply-all", { method: "POST" });
+          if (applyResponse.ok) {
+            const result = await applyResponse.json();
+            if (result.updated > 0) {
+              toast({ title: "Rules Applied", description: `${result.updated} past transactions were updated.` });
+              // Refresh the transaction list to show updated categorizations
+              onRefresh?.();
+            }
+          } else {
+            toast({ title: "Warning", description: "Rule saved, but could not apply to past transactions.", variant: "destructive" });
+          }
+        } catch (applyError) {
+          toast({ title: "Warning", description: "Rule saved, but could not apply to past transactions.", variant: "destructive" });
         }
       }
     } catch (error) {
@@ -170,6 +200,7 @@ export function TransactionList({ transactions, onUpdateTransaction }: Transacti
     setShowRuleDialog(false);
     setPendingRule(null);
     setExistingRule(null);
+    setApplyToPast(true);
   };
 
   const handleSkipRule = () => {
@@ -326,6 +357,18 @@ export function TransactionList({ transactions, onUpdateTransaction }: Transacti
                     <span className="text-purple-600 font-medium">{pendingRule.category}</span>
                   </div>
                 )}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="apply-to-past"
+                  checked={applyToPast}
+                  onCheckedChange={(checked) => setApplyToPast(checked === true)}
+                  data-testid="checkbox-apply-to-past"
+                />
+                <Label htmlFor="apply-to-past" className="text-sm font-normal cursor-pointer">
+                  Apply to all past transactions
+                </Label>
               </div>
             </div>
           )}
