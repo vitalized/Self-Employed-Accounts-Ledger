@@ -1,4 +1,4 @@
-import { users, transactions, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction } from "@shared/schema";
+import { users, transactions, settings, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -14,6 +14,11 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: string, updates: UpdateTransaction): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<boolean>;
+  
+  // Settings methods
+  getSetting(key: string): Promise<Settings | undefined>;
+  setSetting(key: string, value: string): Promise<Settings>;
+  deleteSetting(key: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -72,9 +77,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateTransaction(id: string, updates: UpdateTransaction): Promise<Transaction | undefined> {
     // Convert amount to string if it's a number
-    const values = updates.amount !== undefined 
-      ? { ...updates, amount: String(updates.amount) }
-      : updates;
+    const values: Record<string, any> = { ...updates };
+    if (updates.amount !== undefined) {
+      values.amount = String(updates.amount);
+    }
     
     const [transaction] = await db
       .update(transactions)
@@ -88,6 +94,38 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(transactions)
       .where(eq(transactions.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Settings methods
+  async getSetting(key: string): Promise<Settings | undefined> {
+    const [setting] = await db.select().from(settings).where(eq(settings.key, key));
+    return setting || undefined;
+  }
+
+  async setSetting(key: string, value: string): Promise<Settings> {
+    // Upsert: try to update, if not found insert
+    const existing = await this.getSetting(key);
+    if (existing) {
+      const [updated] = await db
+        .update(settings)
+        .set({ value, updatedAt: new Date() })
+        .where(eq(settings.key, key))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(settings)
+      .values({ key, value })
+      .returning();
+    return created;
+  }
+
+  async deleteSetting(key: string): Promise<boolean> {
+    const result = await db
+      .delete(settings)
+      .where(eq(settings.key, key))
       .returning();
     return result.length > 0;
   }

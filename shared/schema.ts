@@ -51,3 +51,19 @@ export const updateTransactionSchema = insertTransactionSchema.partial();
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type UpdateTransaction = z.infer<typeof updateTransactionSchema>;
+
+// App settings for storing API tokens and preferences
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSettingsSchema = createInsertSchema(settings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertSettings = z.infer<typeof insertSettingsSchema>;
+export type Settings = typeof settings.$inferSelect;

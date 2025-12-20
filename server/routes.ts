@@ -4,6 +4,9 @@ import { storage } from "./storage";
 import { insertTransactionSchema, updateTransactionSchema } from "@shared/schema";
 import { z } from "zod";
 
+const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
+const STARLING_SANDBOX_API_BASE = "https://api-sandbox.starlingbank.com/api/v2";
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -160,6 +163,201 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error seeding database:", error);
       res.status(500).json({ error: "Failed to seed database" });
+    }
+  });
+
+  // ===== Starling Bank API endpoints =====
+
+  // Check Starling connection status
+  app.get("/api/starling/status", async (req, res) => {
+    try {
+      const tokenSetting = await storage.getSetting("starling_token");
+      if (!tokenSetting) {
+        return res.json({ connected: false });
+      }
+      
+      // Verify token is still valid by making a test API call
+      const response = await fetch(`${STARLING_API_BASE}/accounts`, {
+        headers: {
+          "Authorization": `Bearer ${tokenSetting.value}`,
+          "Accept": "application/json"
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        res.json({ 
+          connected: true, 
+          accountCount: data.accounts?.length || 0
+        });
+      } else {
+        // Token is invalid, remove it
+        await storage.deleteSetting("starling_token");
+        res.json({ connected: false, reason: "Token expired or invalid" });
+      }
+    } catch (error) {
+      console.error("Error checking Starling status:", error);
+      res.json({ connected: false, reason: "Connection error" });
+    }
+  });
+
+  // Connect to Starling (save and verify token)
+  app.post("/api/starling/connect", async (req, res) => {
+    try {
+      const { token, useSandbox } = req.body;
+      
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ error: "Personal Access Token is required" });
+      }
+
+      const apiBase = useSandbox ? STARLING_SANDBOX_API_BASE : STARLING_API_BASE;
+      
+      // Verify the token by calling the accounts endpoint
+      const response = await fetch(`${apiBase}/accounts`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Starling API error:", response.status, errorText);
+        return res.status(401).json({ 
+          error: "Invalid token", 
+          message: "Could not authenticate with Starling Bank. Please check your Personal Access Token."
+        });
+      }
+
+      const accountsData = await response.json();
+      
+      // Save the token securely
+      await storage.setSetting("starling_token", token);
+      await storage.setSetting("starling_sandbox", useSandbox ? "true" : "false");
+
+      res.json({ 
+        success: true, 
+        message: "Successfully connected to Starling Bank",
+        accounts: accountsData.accounts?.length || 0
+      });
+    } catch (error) {
+      console.error("Error connecting to Starling:", error);
+      res.status(500).json({ error: "Failed to connect to Starling Bank" });
+    }
+  });
+
+  // Disconnect from Starling
+  app.post("/api/starling/disconnect", async (req, res) => {
+    try {
+      await storage.deleteSetting("starling_token");
+      await storage.deleteSetting("starling_sandbox");
+      res.json({ success: true, message: "Disconnected from Starling Bank" });
+    } catch (error) {
+      console.error("Error disconnecting from Starling:", error);
+      res.status(500).json({ error: "Failed to disconnect" });
+    }
+  });
+
+  // Sync transactions from Starling
+  app.post("/api/starling/sync", async (req, res) => {
+    try {
+      const tokenSetting = await storage.getSetting("starling_token");
+      const sandboxSetting = await storage.getSetting("starling_sandbox");
+      
+      if (!tokenSetting) {
+        return res.status(401).json({ error: "Not connected to Starling Bank" });
+      }
+
+      const apiBase = sandboxSetting?.value === "true" ? STARLING_SANDBOX_API_BASE : STARLING_API_BASE;
+      const token = tokenSetting.value;
+
+      // Get accounts
+      const accountsRes = await fetch(`${apiBase}/accounts`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json"
+        }
+      });
+
+      if (!accountsRes.ok) {
+        return res.status(401).json({ error: "Failed to fetch accounts. Token may be invalid." });
+      }
+
+      const accountsData = await accountsRes.json();
+      const accounts = accountsData.accounts || [];
+      
+      if (accounts.length === 0) {
+        return res.json({ success: true, imported: 0, message: "No accounts found" });
+      }
+
+      let totalImported = 0;
+
+      for (const account of accounts) {
+        const accountUid = account.accountUid;
+        const categoryUid = account.defaultCategory;
+
+        // Get transactions from the last 90 days (API limit)
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - 90);
+        
+        const transactionsRes = await fetch(
+          `${apiBase}/feed/account/${accountUid}/category/${categoryUid}?changesSince=${fromDate.toISOString()}`,
+          {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Accept": "application/json"
+            }
+          }
+        );
+
+        if (!transactionsRes.ok) {
+          console.error("Failed to fetch transactions for account:", accountUid);
+          continue;
+        }
+
+        const feedData = await transactionsRes.json();
+        const feedItems = feedData.feedItems || [];
+
+        for (const item of feedItems) {
+          // Check if we already have this transaction (by reference)
+          const existingTransactions = await storage.getTransactions();
+          const alreadyExists = existingTransactions.some(
+            t => t.description.includes(item.feedItemUid)
+          );
+          
+          if (alreadyExists) continue;
+
+          // Convert Starling feed item to our transaction format
+          const isIncoming = item.direction === "IN";
+          const amount = isIncoming 
+            ? item.amount.minorUnits / 100 
+            : -(item.amount.minorUnits / 100);
+
+          await storage.createTransaction({
+            userId: null,
+            date: new Date(item.transactionTime),
+            description: `${item.counterPartyName || item.reference || "Unknown"} [${item.feedItemUid.slice(0, 8)}]`,
+            amount: String(amount),
+            merchant: item.counterPartyName || "Unknown",
+            type: "Unreviewed",
+            category: null,
+            businessType: isIncoming ? "Income" : "Expense",
+            status: item.status === "SETTLED" ? "Cleared" : "Pending",
+            tags: [],
+          });
+
+          totalImported++;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        imported: totalImported, 
+        message: `Imported ${totalImported} new transactions from Starling Bank`
+      });
+    } catch (error) {
+      console.error("Error syncing from Starling:", error);
+      res.status(500).json({ error: "Failed to sync transactions" });
     }
   });
 
