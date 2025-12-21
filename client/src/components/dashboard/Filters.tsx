@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { DateFilter, FilterState } from "@/lib/types";
-import { Search, Download, RefreshCw, CalendarIcon } from "lucide-react";
+import { Search, Download, RefreshCw, CalendarIcon, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -155,6 +155,25 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {(filterState.search || filterState.type || filterState.category || filterState.dateRange !== 'this-month') && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => onFilterChange({ 
+              search: '', 
+              type: undefined, 
+              category: undefined, 
+              dateRange: 'this-month',
+              customStartDate: undefined,
+              customEndDate: undefined
+            })}
+            className="text-muted-foreground hover:text-foreground"
+            data-testid="button-clear-filters"
+          >
+            <X className="mr-1 h-4 w-4" />
+            Clear Filters
+          </Button>
+        )}
         <Button variant="outline" onClick={onRefresh} disabled={isSyncing}>
           <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
           {isSyncing ? "Syncing..." : "Sync Bank"}
