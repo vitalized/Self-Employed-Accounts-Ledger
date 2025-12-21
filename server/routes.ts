@@ -559,5 +559,95 @@ export async function registerRoutes(
     }
   });
 
+  // Backfill references for existing transactions
+  app.post("/api/starling/backfill-references", async (req, res) => {
+    try {
+      const tokenSetting = await storage.getSetting("starling_token");
+      const sandboxSetting = await storage.getSetting("starling_sandbox");
+      
+      if (!tokenSetting) {
+        return res.status(401).json({ error: "Not connected to Starling Bank" });
+      }
+
+      const apiBase = sandboxSetting?.value === "true" ? STARLING_SANDBOX_API_BASE : STARLING_API_BASE;
+      const token = decrypt(tokenSetting.value);
+
+      // Get accounts
+      const accountsRes = await fetch(`${apiBase}/accounts`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json"
+        }
+      });
+
+      if (!accountsRes.ok) {
+        return res.status(401).json({ error: "Failed to fetch accounts. Token may be invalid." });
+      }
+
+      const accountsData = await accountsRes.json();
+      const accounts = accountsData.accounts || [];
+      
+      if (accounts.length === 0) {
+        return res.json({ success: true, updated: 0, message: "No accounts found" });
+      }
+
+      // Get all existing transactions
+      const existingTransactions = await storage.getTransactions();
+      let totalUpdated = 0;
+
+      for (const account of accounts) {
+        const accountUid = account.accountUid;
+        const categoryUid = account.defaultCategory;
+
+        // Get transactions from the last 90 days
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - 90);
+        
+        const transactionsRes = await fetch(
+          `${apiBase}/feed/account/${accountUid}/category/${categoryUid}?changesSince=${fromDate.toISOString()}`,
+          {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Accept": "application/json"
+            }
+          }
+        );
+
+        if (!transactionsRes.ok) {
+          console.error("Failed to fetch transactions for account:", accountUid);
+          continue;
+        }
+
+        const feedData = await transactionsRes.json();
+        const feedItems = feedData.feedItems || [];
+
+        for (const item of feedItems) {
+          const feedItemUid = item.feedItemUid;
+          const reference = item.reference || null;
+          
+          // Find matching transaction in our database
+          const matchingTx = existingTransactions.find(
+            t => t.tags?.includes(`starling:${feedItemUid}`)
+          );
+          
+          // Update if found and reference is missing or different
+          if (matchingTx && reference && matchingTx.reference !== reference) {
+            await storage.updateTransaction(matchingTx.id, { reference });
+            totalUpdated++;
+          }
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        updated: totalUpdated, 
+        message: `Updated ${totalUpdated} transactions with references`
+      });
+    } catch (error) {
+      console.error("Error backfilling references:", error);
+      res.status(500).json({ error: "Failed to backfill references" });
+    }
+  });
+
   return httpServer;
 }

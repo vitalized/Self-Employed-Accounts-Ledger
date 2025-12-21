@@ -31,6 +31,7 @@ export default function Settings() {
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [token, setToken] = useState("");
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [backfillingRefs, setBackfillingRefs] = useState(false);
 
   // Rules state
   const [rules, setRules] = useState<CategorizationRule[]>([]);
@@ -261,6 +262,39 @@ export default function Settings() {
     }
   };
 
+  const handleBackfillReferences = async () => {
+    setBackfillingRefs(true);
+    try {
+      const response = await fetch("/api/starling/backfill-references", {
+        method: "POST"
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+        toast({
+          title: "References Updated",
+          description: data.message || `Updated ${data.updated} transactions with references.`,
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data.error || "Failed to update transaction references.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update references. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setBackfillingRefs(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl">
@@ -303,11 +337,22 @@ export default function Settings() {
                   )}
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col gap-2">
                  {starlingConnected ? (
-                   <Button variant="outline" size="sm" onClick={handleDisconnectStarling} className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                     Disconnect
-                   </Button>
+                   <>
+                     <Button 
+                       variant="outline" 
+                       size="sm" 
+                       onClick={handleBackfillReferences}
+                       disabled={backfillingRefs}
+                       className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                     >
+                       {backfillingRefs ? "Updating..." : "Update References"}
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={handleDisconnectStarling} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                       Disconnect
+                     </Button>
+                   </>
                  ) : (
                    <div className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 rounded text-xs font-medium text-muted-foreground">
                      Not Connected
