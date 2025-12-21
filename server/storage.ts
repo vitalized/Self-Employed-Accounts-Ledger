@@ -198,10 +198,11 @@ export class DatabaseStorage implements IStorage {
     const rules = await this.getRules();
     const description = transaction.description.toLowerCase();
     const merchant = transaction.merchant.toLowerCase();
+    const reference = (transaction.reference || '').toLowerCase();
     
     for (const rule of rules) {
       const keyword = rule.keyword.toLowerCase();
-      if (description.includes(keyword) || merchant.includes(keyword)) {
+      if (description.includes(keyword) || merchant.includes(keyword) || reference.includes(keyword)) {
         return {
           type: rule.type,
           businessType: rule.businessType,
