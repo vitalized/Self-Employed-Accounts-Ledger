@@ -625,9 +625,7 @@ export async function registerRoutes(
           const feedItemUid = item.feedItemUid;
           const reference = item.reference || null;
           
-          // Log the feed item to debug reference field
-          console.log(`Feed item: ${item.counterPartyName}, reference: "${item.reference}", keys:`, Object.keys(item).join(', '));
-          
+                    
           // Find matching transaction in our database
           const matchingTx = existingTransactions.find(
             t => t.tags?.includes(`starling:${feedItemUid}`)
@@ -635,7 +633,6 @@ export async function registerRoutes(
           
           // Update if found and reference is missing or different
           if (matchingTx && reference && matchingTx.reference !== reference) {
-            console.log(`Updating tx ${matchingTx.id} with reference: "${reference}"`);
             await storage.updateTransaction(matchingTx.id, { reference });
             totalUpdated++;
           }

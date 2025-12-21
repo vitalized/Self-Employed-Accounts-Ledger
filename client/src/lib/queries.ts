@@ -8,6 +8,7 @@ function apiToTransaction(apiTx: ApiTransaction): Transaction {
     id: apiTx.id,
     date: apiTx.date,
     description: apiTx.description,
+    reference: apiTx.reference || undefined,
     amount: parseFloat(apiTx.amount),
     merchant: apiTx.merchant,
     type: apiTx.type as any,

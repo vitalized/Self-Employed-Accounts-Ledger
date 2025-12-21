@@ -6,6 +6,7 @@ export interface ApiTransaction {
   userId?: string | null;
   date: string;
   description: string;
+  reference?: string | null;
   amount: string;
   merchant: string;
   type: string;
