@@ -6,10 +6,11 @@ import { useState } from "react";
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { useMockData, setUseMockData } = useDataMode();
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
+      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <main className="flex-1 overflow-y-auto">
         {useMockData && !bannerDismissed && (
           <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-white px-4 py-2 flex items-center justify-center gap-3 animate-pulse shadow-lg">
