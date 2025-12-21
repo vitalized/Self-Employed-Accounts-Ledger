@@ -58,4 +58,19 @@ export const api = {
       if (!res.ok) throw new Error('Failed to delete transaction');
     },
   },
+  notes: {
+    async getAll(): Promise<{ id: string; description: string; note: string }[]> {
+      const res = await fetch(`${API_BASE}/notes`);
+      if (!res.ok) throw new Error('Failed to fetch notes');
+      return res.json();
+    },
+    async set(description: string, note: string): Promise<void> {
+      const res = await fetch(`${API_BASE}/notes`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description, note }),
+      });
+      if (!res.ok) throw new Error('Failed to save note');
+    },
+  },
 };

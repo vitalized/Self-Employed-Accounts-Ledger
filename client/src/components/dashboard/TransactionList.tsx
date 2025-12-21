@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Transaction } from "@/lib/types";
 import { 
   Table, 
@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/api";
 
 interface CategorizationRule {
   id: string;
@@ -63,6 +64,8 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
   const [applyToPast, setApplyToPast] = useState(true);
   const [sortColumn, setSortColumn] = useState<'date' | 'description' | 'amount' | 'type' | 'category'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [pendingNotes, setPendingNotes] = useState<Record<string, string>>({});
 
   const toggleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -104,6 +107,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
 
   useEffect(() => {
     fetchRules();
+    fetchNotes();
   }, []);
 
   const fetchRules = async () => {
@@ -116,6 +120,44 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
     } catch (error) {
       console.error("Error fetching rules:", error);
     }
+  };
+
+  const fetchNotes = async () => {
+    try {
+      const data = await api.notes.getAll();
+      const notesMap: Record<string, string> = {};
+      for (const n of data) {
+        notesMap[n.description] = n.note;
+      }
+      setNotes(notesMap);
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+    }
+  };
+
+  const handleNoteChange = (description: string, value: string) => {
+    setPendingNotes(prev => ({ ...prev, [description]: value }));
+  };
+
+  const saveNote = useCallback(async (description: string, note: string) => {
+    try {
+      await api.notes.set(description, note);
+      setNotes(prev => ({ ...prev, [description]: note }));
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to save note.", variant: "destructive" });
+    }
+  }, [toast]);
+
+  const handleNoteBlur = (description: string) => {
+    const pendingValue = pendingNotes[description];
+    if (pendingValue !== undefined && pendingValue !== notes[description]) {
+      saveNote(description, pendingValue);
+    }
+    setPendingNotes(prev => {
+      const copy = { ...prev };
+      delete copy[description];
+      return copy;
+    });
   };
 
   const getCategoriesForTransaction = (t: Transaction) => {
@@ -299,6 +341,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Category <SortIcon column="category" />
               </button>
             </TableHead>
+            <TableHead className="w-[180px]">Notes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -374,11 +417,21 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                   <div className="text-sm text-muted-foreground">-</div>
                 )}
               </TableCell>
+              <TableCell>
+                <Input
+                  data-testid={`input-note-${t.id}`}
+                  placeholder="Add note..."
+                  className="h-7 text-xs"
+                  value={pendingNotes[t.description] ?? notes[t.description] ?? ''}
+                  onChange={(e) => handleNoteChange(t.description, e.target.value)}
+                  onBlur={() => handleNoteBlur(t.description)}
+                />
+              </TableCell>
             </TableRow>
           ))}
           {transactions.length === 0 && (
              <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center">
+              <TableCell colSpan={6} className="h-24 text-center">
                 No transactions found.
               </TableCell>
             </TableRow>
