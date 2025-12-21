@@ -278,7 +278,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                     >
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-[300px] overflow-y-auto">
                       {getCategoriesForTransaction(t).map((cat) => (
                         <SelectItem 
                           key={cat.code} 

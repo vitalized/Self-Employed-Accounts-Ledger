@@ -136,7 +136,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           <SelectTrigger className="w-[180px]" data-testid="filter-category">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[300px] overflow-y-auto">
             <SelectItem value="All">All Categories</SelectItem>
             <SelectGroup>
               <SelectLabel className="text-emerald-600">Income</SelectLabel>
