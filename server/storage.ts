@@ -1,4 +1,4 @@
-import { users, transactions, settings, categorizationRules, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule } from "@shared/schema";
+import { users, transactions, settings, categorizationRules, transactionNotes, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, ilike } from "drizzle-orm";
 
@@ -31,6 +31,12 @@ export interface IStorage {
   updateRule(id: string, updates: Partial<InsertCategorizationRule>): Promise<CategorizationRule | undefined>;
   deleteRule(id: string): Promise<boolean>;
   applyRulesToTransaction(transaction: Transaction): Promise<{ type: string; businessType: string | null; category: string | null } | null>;
+  
+  // Transaction notes methods
+  getNotes(): Promise<TransactionNote[]>;
+  getNoteByDescription(description: string): Promise<TransactionNote | undefined>;
+  setNote(description: string, note: string): Promise<TransactionNote>;
+  deleteNote(description: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -211,6 +217,43 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return null;
+  }
+
+  // Transaction notes methods
+  async getNotes(): Promise<TransactionNote[]> {
+    return await db.select().from(transactionNotes);
+  }
+
+  async getNoteByDescription(description: string): Promise<TransactionNote | undefined> {
+    const [note] = await db.select()
+      .from(transactionNotes)
+      .where(eq(transactionNotes.description, description));
+    return note || undefined;
+  }
+
+  async setNote(description: string, note: string): Promise<TransactionNote> {
+    const existing = await this.getNoteByDescription(description);
+    if (existing) {
+      const [updated] = await db
+        .update(transactionNotes)
+        .set({ note, updatedAt: new Date() })
+        .where(eq(transactionNotes.description, description))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(transactionNotes)
+      .values({ description, note })
+      .returning();
+    return created;
+  }
+
+  async deleteNote(description: string): Promise<boolean> {
+    const result = await db
+      .delete(transactionNotes)
+      .where(eq(transactionNotes.description, description))
+      .returning();
+    return result.length > 0;
   }
 }
 

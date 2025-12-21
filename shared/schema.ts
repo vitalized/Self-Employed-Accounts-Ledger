@@ -86,3 +86,19 @@ export const insertCategorizationRuleSchema = createInsertSchema(categorizationR
 
 export type InsertCategorizationRule = z.infer<typeof insertCategorizationRuleSchema>;
 export type CategorizationRule = typeof categorizationRules.$inferSelect;
+
+// Transaction notes - keyed by description for shared notes across matching transactions
+export const transactionNotes = pgTable("transaction_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  description: text("description").notNull().unique(),
+  note: text("note").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTransactionNoteSchema = createInsertSchema(transactionNotes).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertTransactionNote = z.infer<typeof insertTransactionNoteSchema>;
+export type TransactionNote = typeof transactionNotes.$inferSelect;
