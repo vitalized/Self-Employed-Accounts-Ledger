@@ -371,7 +371,8 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                     className="h-6 text-[10px] px-2 rounded-none rounded-l-md border-0"
                     onClick={() => handleTypeChange(t, 'Business')}
                   >
-                    Biz
+                    <span className="md:hidden">Biz</span>
+                    <span className="hidden md:inline">Business</span>
                   </Button>
                   <Button 
                     data-testid={`button-type-personal-${t.id}`}
@@ -380,7 +381,8 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                     className="h-6 text-[10px] px-2 rounded-none rounded-r-md border-0 border-l"
                     onClick={() => handleTypeChange(t, 'Personal')}
                   >
-                    Per
+                    <span className="md:hidden">Per</span>
+                    <span className="hidden md:inline">Personal</span>
                   </Button>
                 </div>
               </TableCell>
