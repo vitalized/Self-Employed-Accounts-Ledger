@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { DateFilter, FilterState } from "@/lib/types";
-import { Search, Download, RefreshCw, CalendarIcon, X } from "lucide-react";
+import { Search, Download, RefreshCw, CalendarIcon, X, AlertCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -30,6 +30,21 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
   return (
     <div className="mb-6 flex flex-col space-y-4">
       <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={filterState.type === 'Unreviewed' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onFilterChange({ type: filterState.type === 'Unreviewed' ? undefined : 'Unreviewed' })}
+          className={cn(
+            filterState.type === 'Unreviewed' 
+              ? "bg-amber-500 hover:bg-amber-600 text-white" 
+              : "border-amber-300 text-amber-700 hover:bg-amber-50"
+          )}
+          data-testid="button-needs-review"
+        >
+          <AlertCircle className="mr-1 h-4 w-4" />
+          Needs Review
+        </Button>
+        
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
