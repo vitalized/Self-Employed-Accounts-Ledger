@@ -311,7 +311,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
               </TableCell>
               <TableCell>
                 <div className="font-medium">{t.description}</div>
-                <div className="text-xs text-muted-foreground">{t.merchant}</div>
+                <div className="text-xs text-muted-foreground">{t.reference || t.merchant}</div>
               </TableCell>
               <TableCell className={cn(
                 "text-right font-bold",

@@ -5,6 +5,7 @@ export interface Transaction {
   id: string;
   date: string; // ISO date string
   description: string;
+  reference?: string; // Transaction reference from bank API
   amount: number; // Negative for money out, positive for money in
   type: TransactionType;
   category?: string;

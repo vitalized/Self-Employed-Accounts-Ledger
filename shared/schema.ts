@@ -15,6 +15,7 @@ export const transactions = pgTable("transactions", {
   userId: varchar("user_id").references(() => users.id),
   date: timestamp("date").notNull(),
   description: text("description").notNull(),
+  reference: text("reference"), // Transaction reference from bank API
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   merchant: text("merchant").notNull(),
   type: text("type").notNull(), // Business, Personal, Unreviewed, Split
