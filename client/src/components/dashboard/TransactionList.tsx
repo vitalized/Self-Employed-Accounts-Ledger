@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Wand2 } from "lucide-react";
+import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useToast } from "@/hooks/use-toast";
 
@@ -61,6 +61,46 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
   } | null>(null);
   const [existingRule, setExistingRule] = useState<CategorizationRule | null>(null);
   const [applyToPast, setApplyToPast] = useState(true);
+  const [sortColumn, setSortColumn] = useState<'date' | 'description' | 'amount' | 'type' | 'category'>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const toggleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: typeof sortColumn }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="ml-1 h-3 w-3" />
+      : <ArrowDown className="ml-1 h-3 w-3" />;
+  };
+
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    let comparison = 0;
+    switch (sortColumn) {
+      case 'date':
+        comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+        break;
+      case 'description':
+        comparison = (a.description || '').localeCompare(b.description || '');
+        break;
+      case 'amount':
+        comparison = a.amount - b.amount;
+        break;
+      case 'type':
+        comparison = (a.type || '').localeCompare(b.type || '');
+        break;
+      case 'category':
+        comparison = (a.category || '').localeCompare(b.category || '');
+        break;
+    }
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
 
   useEffect(() => {
     fetchRules();
@@ -214,15 +254,55 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[120px]">Date</TableHead>
-            <TableHead>Transaction</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="w-[200px]">Type</TableHead>
-            <TableHead className="w-[200px]">Category</TableHead>
+            <TableHead className="w-[120px]">
+              <button 
+                onClick={() => toggleSort('date')} 
+                className="flex items-center hover:text-foreground transition-colors"
+                data-testid="sort-date"
+              >
+                Date <SortIcon column="date" />
+              </button>
+            </TableHead>
+            <TableHead>
+              <button 
+                onClick={() => toggleSort('description')} 
+                className="flex items-center hover:text-foreground transition-colors"
+                data-testid="sort-description"
+              >
+                Transaction <SortIcon column="description" />
+              </button>
+            </TableHead>
+            <TableHead className="text-right">
+              <button 
+                onClick={() => toggleSort('amount')} 
+                className="flex items-center ml-auto hover:text-foreground transition-colors"
+                data-testid="sort-amount"
+              >
+                Amount <SortIcon column="amount" />
+              </button>
+            </TableHead>
+            <TableHead className="w-[200px]">
+              <button 
+                onClick={() => toggleSort('type')} 
+                className="flex items-center hover:text-foreground transition-colors"
+                data-testid="sort-type"
+              >
+                Type <SortIcon column="type" />
+              </button>
+            </TableHead>
+            <TableHead className="w-[200px]">
+              <button 
+                onClick={() => toggleSort('category')} 
+                className="flex items-center hover:text-foreground transition-colors"
+                data-testid="sort-category"
+              >
+                Category <SortIcon column="category" />
+              </button>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {transactions.map((t) => (
+          {sortedTransactions.map((t) => (
             <TableRow key={t.id} data-testid={`row-transaction-${t.id}`} className={cn(
               t.type === 'Unreviewed' ? "bg-amber-50/50 dark:bg-amber-900/10" : ""
             )}>
