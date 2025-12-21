@@ -13,6 +13,17 @@ export const SA103_EXPENSE_CATEGORIES = [
   { code: "28", label: "Professional Fees", description: "Accountancy, legal and other professional fees" },
   { code: "29", label: "Depreciation", description: "Depreciation and loss/profit on sale of assets" },
   { code: "30", label: "Other Expenses", description: "Other business expenses" },
+  { code: "C1", label: "Postage and Stationery", description: "Postage, stamps, envelopes, paper and stationery" },
+  { code: "C2", label: "Mobile Phone", description: "Mobile phone bills and top-ups" },
+  { code: "C3", label: "Broadband", description: "Internet and broadband costs" },
+  { code: "C4", label: "Website and Hosting", description: "Website hosting, domain names and web services" },
+  { code: "C5", label: "Software and Computer Incidentals", description: "Software subscriptions, licenses and computer consumables" },
+  { code: "C6", label: "Insurance & Licences", description: "Business insurance and professional licences" },
+  { code: "C7", label: "Subscriptions", description: "Professional and trade subscriptions" },
+  { code: "C8", label: "Courses and Training", description: "Training courses including CPE/CPD" },
+  { code: "C9", label: "Books and Professional Magazines", description: "Professional books, journals and publications" },
+  { code: "C10", label: "Accountancy", description: "Accountancy and bookkeeping fees" },
+  { code: "C11", label: "Hotels and Business Accommodation", description: "Hotel stays and accommodation for business travel" },
 ] as const;
 
 export const INCOME_CATEGORIES = [
