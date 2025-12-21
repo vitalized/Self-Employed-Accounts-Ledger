@@ -20,6 +20,10 @@ export interface IStorage {
   setSetting(key: string, value: string): Promise<Settings>;
   deleteSetting(key: string): Promise<boolean>;
   
+  // Sync status methods
+  getLastSyncAt(): Promise<Date | null>;
+  setLastSyncAt(date: Date): Promise<void>;
+  
   // Categorization rules methods
   getRules(): Promise<CategorizationRule[]>;
   getRule(id: string): Promise<CategorizationRule | undefined>;
@@ -136,6 +140,19 @@ export class DatabaseStorage implements IStorage {
       .where(eq(settings.key, key))
       .returning();
     return result.length > 0;
+  }
+
+  // Sync status methods
+  async getLastSyncAt(): Promise<Date | null> {
+    const setting = await this.getSetting('lastSyncAt');
+    if (setting?.value) {
+      return new Date(setting.value);
+    }
+    return null;
+  }
+
+  async setLastSyncAt(date: Date): Promise<void> {
+    await this.setSetting('lastSyncAt', date.toISOString());
   }
 
   // Categorization rules methods

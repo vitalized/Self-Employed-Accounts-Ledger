@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCards } from "@/components/dashboard/StatCards";
 import { TransactionChart } from "@/components/dashboard/TransactionChart";
@@ -18,6 +18,26 @@ export default function Dashboard() {
   const updateTransactionMutation = useUpdateTransaction();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Fetch last sync time on load
+  useEffect(() => {
+    const fetchSyncStatus = async () => {
+      try {
+        const response = await fetch("/api/sync-status");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.lastSyncAt) {
+            setLastUpdated(new Date(data.lastSyncAt));
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch sync status:", error);
+      }
+    };
+    if (!useMockData) {
+      fetchSyncStatus();
+    }
+  }, [useMockData]);
   
   const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
   

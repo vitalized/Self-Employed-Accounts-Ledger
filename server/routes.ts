@@ -532,6 +532,9 @@ export async function registerRoutes(
         }
       }
 
+      // Save the last sync timestamp
+      await storage.setLastSyncAt(new Date());
+      
       res.json({ 
         success: true, 
         imported: totalImported, 
@@ -540,6 +543,17 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error syncing from Starling:", error);
       res.status(500).json({ error: "Failed to sync transactions" });
+    }
+  });
+
+  // Get sync status (last sync time)
+  app.get("/api/sync-status", async (req, res) => {
+    try {
+      const lastSyncAt = await storage.getLastSyncAt();
+      res.json({ lastSyncAt: lastSyncAt?.toISOString() || null });
+    } catch (error) {
+      console.error("Error fetching sync status:", error);
+      res.status(500).json({ error: "Failed to fetch sync status" });
     }
   });
 
