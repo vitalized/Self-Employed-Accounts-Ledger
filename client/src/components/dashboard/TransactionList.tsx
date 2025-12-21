@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
@@ -66,6 +66,8 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [pendingNotes, setPendingNotes] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 100;
 
   const toggleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -104,6 +106,17 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
     }
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE));
+  const validPage = Math.min(currentPage, totalPages);
+  const startIndex = (validPage - 1) * ITEMS_PER_PAGE;
+  const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Reset to page 1 when transactions change (filters applied)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [transactions]);
 
   useEffect(() => {
     fetchRules();
@@ -345,7 +358,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedTransactions.map((t) => (
+          {paginatedTransactions.map((t) => (
             <TableRow key={t.id} data-testid={`row-transaction-${t.id}`} className={cn(
               t.type === 'Unreviewed' ? "bg-amber-50/50 dark:bg-amber-900/10" : ""
             )}>
@@ -440,6 +453,40 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
           )}
         </TableBody>
       </Table>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedTransactions.length)} of {sortedTransactions.length}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={validPage === 1}
+              data-testid="button-prev-page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              Page {validPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={validPage === totalPages}
+              data-testid="button-next-page"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
         <DialogContent className="sm:max-w-md">
