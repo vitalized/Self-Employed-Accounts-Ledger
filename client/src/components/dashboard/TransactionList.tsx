@@ -363,24 +363,24 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 {t.amount > 0 ? '+' : ''}£{Math.abs(t.amount).toFixed(2)}
               </TableCell>
               <TableCell>
-                <div className="flex items-center space-x-1">
+                <div className="inline-flex rounded-md border">
                   <Button 
                     data-testid={`button-type-business-${t.id}`}
-                    variant={t.type === 'Business' ? 'default' : 'outline'} 
+                    variant={t.type === 'Business' ? 'default' : 'ghost'} 
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-6 text-[10px] px-2 rounded-none rounded-l-md border-0"
                     onClick={() => handleTypeChange(t, 'Business')}
                   >
-                    Business
+                    Biz
                   </Button>
                   <Button 
                     data-testid={`button-type-personal-${t.id}`}
-                    variant={t.type === 'Personal' ? 'secondary' : 'outline'} 
+                    variant={t.type === 'Personal' ? 'secondary' : 'ghost'} 
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-6 text-[10px] px-2 rounded-none rounded-r-md border-0 border-l"
                     onClick={() => handleTypeChange(t, 'Personal')}
                   >
-                    Personal
+                    Per
                   </Button>
                 </div>
               </TableCell>
