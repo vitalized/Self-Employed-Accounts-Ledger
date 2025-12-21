@@ -354,7 +354,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Category <SortIcon column="category" />
               </button>
             </TableHead>
-            <TableHead className="w-[180px]">Notes</TableHead>
+            <TableHead>Notes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
