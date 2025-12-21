@@ -212,6 +212,39 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Transaction Notes API endpoints =====
+
+  // Get all notes
+  app.get("/api/notes", async (req, res) => {
+    try {
+      const notes = await storage.getNotes();
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      res.status(500).json({ error: "Failed to fetch notes" });
+    }
+  });
+
+  // Set note for a description
+  app.put("/api/notes", async (req, res) => {
+    try {
+      const { description, note } = req.body;
+      if (!description || typeof description !== 'string') {
+        return res.status(400).json({ error: "Description is required" });
+      }
+      if (note === undefined || note === null || note === '') {
+        // Delete note if empty
+        await storage.deleteNote(description);
+        return res.status(204).send();
+      }
+      const savedNote = await storage.setNote(description, note);
+      res.json(savedNote);
+    } catch (error) {
+      console.error("Error saving note:", error);
+      res.status(500).json({ error: "Failed to save note" });
+    }
+  });
+
   // ===== Categorization Rules API endpoints =====
 
   // Get all rules
