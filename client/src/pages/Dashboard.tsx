@@ -6,7 +6,7 @@ import { TransactionList } from "@/components/dashboard/TransactionList";
 import { Filters } from "@/components/dashboard/Filters";
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { FilterState, Transaction } from "@/lib/types";
-import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth } from "date-fns";
+import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, useUpdateTransaction } from "@/lib/queries";
 import { useDataMode } from "@/lib/dataContext";
@@ -17,6 +17,7 @@ export default function Dashboard() {
   const { data: apiTransactions = [], isLoading, refetch } = useTransactions();
   const updateTransactionMutation = useUpdateTransaction();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
   
@@ -152,6 +153,7 @@ export default function Dashboard() {
       if (response.ok) {
         // Refetch transactions to show new ones
         await refetch();
+        setLastUpdated(new Date());
         toast({
           title: "Sync Complete",
           description: data.message || `Imported ${data.imported || 0} new transactions.`,
@@ -215,8 +217,11 @@ export default function Dashboard() {
         <div>
            <div className="flex items-center justify-between py-4">
              <h3 className="text-xl font-semibold">Transactions</h3>
-             <div className="text-sm text-muted-foreground">
-               {filteredTransactions.length} transactions found
+             <div className="text-sm text-muted-foreground flex items-center gap-4">
+               <span>{filteredTransactions.length} transactions found</span>
+               {lastUpdated && (
+                 <span>Last updated: {format(lastUpdated, "dd MMM yyyy 'at' HH:mm")}</span>
+               )}
              </div>
            </div>
 
