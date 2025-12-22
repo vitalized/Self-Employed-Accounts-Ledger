@@ -306,10 +306,10 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
 
   return (
     <div className="rounded-md border bg-card">
-      <Table className="w-full table-fixed">
+      <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">
+            <TableHead>
               <button 
                 onClick={() => toggleSort('date')} 
                 className="flex items-center hover:text-foreground transition-colors"
@@ -336,7 +336,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Amount <SortIcon column="amount" />
               </button>
             </TableHead>
-            <TableHead className="w-[120px]">
+            <TableHead>
               <button 
                 onClick={() => toggleSort('type')} 
                 className="flex items-center hover:text-foreground transition-colors"
@@ -345,7 +345,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Type <SortIcon column="type" />
               </button>
             </TableHead>
-            <TableHead className="w-[180px]">
+            <TableHead>
               <button 
                 onClick={() => toggleSort('category')} 
                 className="flex items-center hover:text-foreground transition-colors"
@@ -354,7 +354,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Category <SortIcon column="category" />
               </button>
             </TableHead>
-            <TableHead className="w-[150px]">Notes</TableHead>
+            <TableHead>Notes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
