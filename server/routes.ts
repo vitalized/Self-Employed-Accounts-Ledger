@@ -796,6 +796,10 @@ export async function registerRoutes(
       let skipped = 0;
       let categorized = 0;
       const errors: string[] = [];
+      
+      // Track fingerprints of transactions added in this batch
+      // This prevents the fuzzy duplicate check from matching newly-imported rows against each other
+      const currentBatchFingerprints = new Set<string>();
 
       for (let i = 1; i < lines.length; i++) {
         try {
@@ -834,14 +838,15 @@ export async function registerRoutes(
           // Create fingerprint for duplicate detection
           const fingerprint = createTransactionFingerprint(date, amount, counterParty, reference);
           
-          // Check if this transaction already exists (exact fingerprint match)
+          // Check if this transaction already exists (exact fingerprint match in DB or current batch)
           if (existingFingerprints.has(fingerprint)) {
             skipped++;
             continue;
           }
           
           // Also check for potential duplicates within +/- 1 day (handles Starling API vs CSV date discrepancy)
-          const potentialDuplicate = await storage.findPotentialDuplicate(date, amount, counterParty, reference);
+          // Exclude fingerprints from current batch so we don't self-collide
+          const potentialDuplicate = await storage.findPotentialDuplicate(date, amount, counterParty, reference, currentBatchFingerprints);
           if (potentialDuplicate) {
             skipped++;
             continue;
@@ -895,8 +900,9 @@ export async function registerRoutes(
             tags: ["import:csv"],
           }, fingerprint);
 
-          // Add fingerprint to set to prevent duplicates within same import
-          existingFingerprints.add(fingerprint);
+          // Add fingerprint to both sets to prevent duplicates within same import
+          existingFingerprints.add(fingerprint);  // For exact match check
+          currentBatchFingerprints.add(fingerprint);  // For fuzzy match exclusion
           imported++;
         } catch (rowError) {
           errors.push(`Line ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Unknown error'}`);

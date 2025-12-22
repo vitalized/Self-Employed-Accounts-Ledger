@@ -16,7 +16,7 @@ export interface IStorage {
   updateTransaction(id: string, updates: UpdateTransaction): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<boolean>;
   getExistingFingerprints(): Promise<Set<string>>;
-  findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null): Promise<Transaction | null>;
+  findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null, excludeFingerprints?: Set<string>): Promise<Transaction | null>;
   
   // Settings methods
   getSetting(key: string): Promise<Settings | undefined>;
@@ -122,10 +122,11 @@ export class DatabaseStorage implements IStorage {
     return fingerprints;
   }
 
-  async findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null): Promise<Transaction | null> {
+  async findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null, excludeFingerprints?: Set<string>): Promise<Transaction | null> {
     // Check for transactions with matching amount, description, reference within +/- 1 day
     // This handles Starling API vs CSV date discrepancies
     // Use UTC date strings to avoid timezone issues
+    // excludeFingerprints: fingerprints to ignore (e.g., rows added in current import batch)
     
     const inputDateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
     const dayBefore = new Date(date);
@@ -149,10 +150,15 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(between(transactions.date, startDate, endDate));
     
-    // First pass: find all matching transactions (same amount/description/reference)
+    // Find matching transactions (same amount/description/reference)
     const matchingTxs: Array<{tx: Transaction, dateStr: string, isFromCSV: boolean}> = [];
     
     for (const tx of candidates) {
+      // Skip transactions from current batch (identified by fingerprint)
+      if (excludeFingerprints && tx.fingerprint && excludeFingerprints.has(tx.fingerprint)) {
+        continue;
+      }
+      
       const txAmount = parseFloat(tx.amount);
       if (Math.abs(txAmount - amount) > 0.01) continue;
       if (tx.description.toLowerCase().trim() !== descLower) continue;
@@ -172,7 +178,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     // For ±1 day matches, only treat as duplicate if there's exactly ONE API transaction
-    // This prevents blocking legitimate consecutive-day transactions
+    // This prevents blocking legitimate consecutive-day transactions (like daily TfL fares)
     const apiMatches = matchingTxs.filter(m => !m.isFromCSV);
     
     if (apiMatches.length === 1) {
