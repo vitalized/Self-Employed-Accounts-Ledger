@@ -169,29 +169,16 @@ export class DatabaseStorage implements IStorage {
       // Only consider as duplicate if:
       // 1. Exact same date (definitely a duplicate), OR
       // 2. Different date but the existing transaction is from Starling API (not CSV import)
-      //    AND the existing transaction's time is near end-of-day (>=22:00) or start-of-day (<02:00)
-      //    This handles Starling API timestamps near midnight showing as next day in CSV
-      //    while allowing legitimate mid-day consecutive-day transactions
+      //    This handles Starling settlement date vs transaction date mismatches
+      //    where the API shows one date and CSV shows another (typically +1 day)
       const isSameDate = txDateStr === inputDateStr;
       const existingIsFromCSV = tx.tags && tx.tags.includes('import:csv');
       
-      if (isSameDate) {
-        // Exact same date - definitely a duplicate
+      if (isSameDate || !existingIsFromCSV) {
+        // Same date = duplicate, OR existing is from API (not CSV) = likely API/CSV date mismatch
         return tx;
       }
-      
-      if (!existingIsFromCSV) {
-        // Existing is from API, check if it's near day boundary (where date mismatches occur)
-        const txTime = new Date(tx.date);
-        const hours = txTime.getUTCHours();
-        const isNearDayBoundary = hours >= 22 || hours < 2; // Near midnight
-        
-        if (isNearDayBoundary) {
-          // API transaction near midnight could show as different day in CSV - treat as duplicate
-          return tx;
-        }
-      }
-      // Otherwise, it's likely a legitimate consecutive-day transaction
+      // If both are from CSV and different dates, it's a legitimate consecutive-day transaction
     }
     
     return null;
