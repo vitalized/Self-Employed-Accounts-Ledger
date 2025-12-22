@@ -69,6 +69,49 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // Get available tax years based on transaction dates
+  app.get("/api/tax-years", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      
+      // UK tax year runs from April 6 to April 5
+      // Calculate which tax years have transactions
+      const taxYears = new Set<string>();
+      
+      for (const tx of transactions) {
+        const date = new Date(tx.date);
+        const year = date.getFullYear();
+        const month = date.getMonth(); // 0-indexed
+        const day = date.getDate();
+        
+        // If before April 6, it's the previous tax year
+        // Tax year 2024-25 is from April 6 2024 to April 5 2025
+        let taxYearStart: number;
+        if (month < 3 || (month === 3 && day < 6)) {
+          // Before April 6 - belongs to previous tax year
+          taxYearStart = year - 1;
+        } else {
+          // April 6 onwards - belongs to current tax year
+          taxYearStart = year;
+        }
+        
+        taxYears.add(`${taxYearStart}-${(taxYearStart + 1).toString().slice(-2)}`);
+      }
+      
+      // Sort tax years in descending order (most recent first)
+      const sortedTaxYears = Array.from(taxYears).sort((a, b) => {
+        const yearA = parseInt(a.split('-')[0]);
+        const yearB = parseInt(b.split('-')[0]);
+        return yearB - yearA;
+      });
+      
+      res.json(sortedTaxYears);
+    } catch (error) {
+      console.error("Error fetching tax years:", error);
+      res.status(500).json({ error: "Failed to fetch tax years" });
+    }
+  });
+
   // Get all transactions
   app.get("/api/transactions", async (req, res) => {
     try {

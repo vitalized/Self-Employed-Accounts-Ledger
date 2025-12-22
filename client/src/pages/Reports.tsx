@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,19 +9,49 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 import { TaxSummary } from "@/components/reports/TaxSummary";
 import { useTransactions } from "@/lib/queries";
 import { useDataMode } from "@/lib/dataContext";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Reports() {
-  const [dateRange, setDateRange] = useState('tax-year-current');
+  const [dateRange, setDateRange] = useState('this-month');
+  const [hasInitializedTaxYear, setHasInitializedTaxYear] = useState(false);
   const { useMockData } = useDataMode();
   const { data: apiTransactions = [], isLoading } = useTransactions();
+  
+  const { data: taxYears = [] } = useQuery<string[]>({
+    queryKey: ["/api/tax-years"],
+    queryFn: async () => {
+      const res = await fetch("/api/tax-years");
+      if (!res.ok) throw new Error("Failed to fetch tax years");
+      return res.json();
+    },
+  });
+
+  // Set default date range to most recent tax year once loaded
+  useEffect(() => {
+    if (taxYears.length > 0 && !hasInitializedTaxYear) {
+      setDateRange(`tax-year-${taxYears[0]}`);
+      setHasInitializedTaxYear(true);
+    }
+  }, [taxYears, hasInitializedTaxYear]);
   
   const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
 
   // Helper to get date range object
   const getFilterDateRange = (filter: string) => {
-    const now = new Date(); // Mocking "today" context if needed, but using real dates for logic
-    // Simplified Tax Year Logic (UK Tax year starts April 6th)
-    // For this prototype, using April 1 - March 31
+    const now = new Date();
+    
+    // Handle dynamic tax year format: 'tax-year-YYYY-YY'
+    if (filter.startsWith('tax-year-')) {
+      const taxYearStr = filter.replace('tax-year-', '');
+      const startYear = parseInt(taxYearStr.split('-')[0]);
+      if (!isNaN(startYear)) {
+        // UK tax year: April 6 to April 5
+        return { 
+          start: new Date(startYear, 3, 6), // April 6
+          end: new Date(startYear + 1, 3, 5, 23, 59, 59) // April 5 next year, end of day
+        };
+      }
+    }
     
     switch (filter) {
       case 'this-month':
@@ -33,19 +63,21 @@ export default function Reports() {
         return { start: startOfMonth(subMonths(now, 3)), end: endOfMonth(subMonths(now, 1)) };
       case 'year-to-date':
         return { start: startOfYear(now), end: now };
-      case 'tax-year-current':
-        return { start: new Date(2025, 3, 1), end: new Date(2026, 2, 31) };
-      case 'tax-year-previous':
-        return { start: new Date(2024, 3, 1), end: new Date(2025, 2, 31) };
       default:
-        return { start: new Date(2025, 3, 1), end: new Date(2026, 2, 31) };
+        // Default to current tax year
+        const currentYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+        return { start: new Date(currentYear, 3, 6), end: new Date(currentYear + 1, 3, 5, 23, 59, 59) };
     }
   };
 
   const getYearLabel = (filter: string) => {
-     if (filter === 'tax-year-current') return '2025-26';
-     if (filter === 'tax-year-previous') return '2024-25';
-     return '2025-26'; // Fallback
+     if (filter.startsWith('tax-year-')) {
+       return filter.replace('tax-year-', '');
+     }
+     // Default to current tax year
+     const now = new Date();
+     const currentYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+     return `${currentYear}-${(currentYear + 1).toString().slice(-2)}`;
   };
 
   const currentRange = getFilterDateRange(dateRange);
@@ -174,8 +206,11 @@ export default function Reports() {
                 <SelectItem value="this-month">This Month</SelectItem>
                 <SelectItem value="last-month">Last Month</SelectItem>
                 <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                <SelectItem value="tax-year-current">Tax Year (2025-26)</SelectItem>
-                <SelectItem value="tax-year-previous">Tax Year (2024-25)</SelectItem>
+                {taxYears.map((taxYear) => (
+                  <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>
+                    Tax Year ({taxYear})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

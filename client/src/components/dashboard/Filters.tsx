@@ -16,6 +16,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
+import { useQuery } from "@tanstack/react-query";
 
 interface FiltersProps {
   filterState: FilterState;
@@ -27,6 +28,15 @@ interface FiltersProps {
 }
 
 export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories, isSyncing = false }: FiltersProps) {
+  const { data: taxYears = [] } = useQuery<string[]>({
+    queryKey: ["/api/tax-years"],
+    queryFn: async () => {
+      const res = await fetch("/api/tax-years");
+      if (!res.ok) throw new Error("Failed to fetch tax years");
+      return res.json();
+    },
+  });
+
   return (
     <div className="mb-6 flex flex-col space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -67,8 +77,11 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
             <SelectItem value="this-month">This Month</SelectItem>
             <SelectItem value="last-month">Last Month</SelectItem>
             <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-            <SelectItem value="tax-year-current">Tax Year 2025-26</SelectItem>
-            <SelectItem value="tax-year-previous">Tax Year 2024-25</SelectItem>
+            {taxYears.map((taxYear) => (
+              <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>
+                Tax Year {taxYear}
+              </SelectItem>
+            ))}
             <SelectItem value="custom">Custom Date</SelectItem>
           </SelectContent>
         </Select>

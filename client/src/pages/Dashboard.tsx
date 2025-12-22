@@ -10,6 +10,7 @@ import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInte
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, useUpdateTransaction } from "@/lib/queries";
 import { useDataMode } from "@/lib/dataContext";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -40,13 +41,32 @@ export default function Dashboard() {
   }, [useMockData]);
   
   const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
+
+  const { data: taxYears = [] } = useQuery<string[]>({
+    queryKey: ["/api/tax-years"],
+    queryFn: async () => {
+      const res = await fetch("/api/tax-years");
+      if (!res.ok) throw new Error("Failed to fetch tax years");
+      return res.json();
+    },
+  });
+
+  const [hasInitializedTaxYear, setHasInitializedTaxYear] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
-    dateRange: 'tax-year-current',
+    dateRange: 'this-month',
     search: '',
     type: undefined,
     category: undefined
   });
+
+  // Set default date range to most recent tax year once loaded
+  useEffect(() => {
+    if (taxYears.length > 0 && !hasInitializedTaxYear) {
+      setFilters(prev => ({ ...prev, dateRange: `tax-year-${taxYears[0]}` }));
+      setHasInitializedTaxYear(true);
+    }
+  }, [taxYears, hasInitializedTaxYear]);
 
   // Extract unique categories for filter
   const availableCategories = useMemo(() => {
@@ -57,13 +77,19 @@ export default function Dashboard() {
   // Helper to get date range object
   const getDateRange = (filter: FilterState['dateRange']) => {
     const now = new Date();
-    // Simplified Tax Year Logic (UK Tax year starts April 6th)
-    // For this prototype, let's assume Tax Year runs April 1 - March 31 for cleaner monthly data
-    const currentTaxYearStart = new Date(2025, 3, 1); // April 1, 2025
-    const currentTaxYearEnd = new Date(2026, 2, 31);
     
-    // Check if we are actually in the 2025-26 tax year or not relative to "today"
-    // Mocking "today" as Dec 19, 2025 based on prompt context
+    // Handle dynamic tax year format: 'tax-year-YYYY-YY'
+    if (filter.startsWith('tax-year-')) {
+      const taxYearStr = filter.replace('tax-year-', '');
+      const startYear = parseInt(taxYearStr.split('-')[0]);
+      if (!isNaN(startYear)) {
+        // UK tax year: April 6 to April 5
+        return { 
+          start: new Date(startYear, 3, 6), // April 6
+          end: new Date(startYear + 1, 3, 5, 23, 59, 59) // April 5 next year, end of day
+        };
+      }
+    }
     
     switch (filter) {
       case 'this-month':
@@ -73,10 +99,6 @@ export default function Dashboard() {
         return { start: lastMonthStart, end: endOfMonth(subMonths(now, 1)) };
       case 'last-3-months':
         return { start: startOfMonth(subMonths(now, 3)), end: endOfMonth(subMonths(now, 1)) };
-      case 'tax-year-current':
-        return { start: new Date(2025, 3, 1), end: new Date(2026, 2, 31) };
-      case 'tax-year-previous':
-        return { start: new Date(2024, 3, 1), end: new Date(2025, 2, 31) };
       case 'custom':
         return { 
           start: filters.customStartDate || startOfMonth(now), 

@@ -19,9 +19,8 @@ export type DateFilter =
   | 'this-month' 
   | 'last-month' 
   | 'last-3-months' 
-  | 'tax-year-current' 
-  | 'tax-year-previous' 
-  | 'custom';
+  | 'custom'
+  | string; // Allows dynamic tax year formats like 'tax-year-2024-25'
 
 export interface FilterState {
   dateRange: DateFilter;
