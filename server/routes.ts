@@ -9,10 +9,13 @@ const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
 const STARLING_SANDBOX_API_BASE = "https://api-sandbox.starlingbank.com/api/v2";
 
 // Shared utility to create transaction fingerprint for duplicate detection
-function createTransactionFingerprint(date: Date, amount: string | number, description: string, reference: string | null): string {
+// Note: Reference is intentionally excluded from fingerprint because Starling API
+// often returns null for reference while CSV exports include reference values,
+// causing the same transaction to have different fingerprints between sources.
+function createTransactionFingerprint(date: Date, amount: string | number, description: string, _reference?: string | null): string {
   const dateStr = date.toISOString().split('T')[0];
   const amountNum = typeof amount === 'string' ? parseFloat(amount) : amount;
-  const normalized = `${dateStr}|${amountNum.toFixed(2)}|${description.toLowerCase().trim()}|${(reference || '').toLowerCase().trim()}`;
+  const normalized = `${dateStr}|${amountNum.toFixed(2)}|${description.toLowerCase().trim()}`;
   return crypto.createHash('sha256').update(normalized).digest('hex').substring(0, 32);
 }
 

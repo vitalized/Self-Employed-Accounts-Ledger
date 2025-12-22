@@ -122,10 +122,11 @@ export class DatabaseStorage implements IStorage {
     return fingerprints;
   }
 
-  async findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null, excludeFingerprints?: Set<string>): Promise<Transaction | null> {
-    // Check for transactions with matching amount, description, reference within +/- 1 day
+  async findPotentialDuplicate(date: Date, amount: number, description: string, _reference: string | null, excludeFingerprints?: Set<string>): Promise<Transaction | null> {
+    // Check for transactions with matching amount and description within +/- 1 day
     // This handles Starling API vs CSV date discrepancies
-    // Use UTC date strings to avoid timezone issues
+    // Note: Reference is intentionally excluded because Starling API often returns null
+    // while CSV exports include reference values, causing false negatives
     // excludeFingerprints: fingerprints to ignore (e.g., rows added in current import batch)
     
     const inputDateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
@@ -140,7 +141,6 @@ export class DatabaseStorage implements IStorage {
     const allowedDates = new Set([dayBeforeStr, inputDateStr, dayAfterStr]);
     
     const descLower = description.toLowerCase().trim();
-    const refLower = (reference || '').toLowerCase().trim();
     
     // Query transactions within date range (more efficient than full table scan)
     const startDate = new Date(dayBeforeStr + 'T00:00:00Z');
@@ -150,7 +150,7 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(between(transactions.date, startDate, endDate));
     
-    // Find matching transactions (same amount/description/reference)
+    // Find matching transactions (same amount/description, reference excluded)
     const matchingTxs: Array<{tx: Transaction, dateStr: string, isFromCSV: boolean}> = [];
     
     for (const tx of candidates) {
@@ -162,8 +162,6 @@ export class DatabaseStorage implements IStorage {
       const txAmount = parseFloat(tx.amount);
       if (Math.abs(txAmount - amount) > 0.01) continue;
       if (tx.description.toLowerCase().trim() !== descLower) continue;
-      const txRef = (tx.reference || '').toLowerCase().trim();
-      if (txRef !== refLower) continue;
       const txDateStr = new Date(tx.date).toISOString().split('T')[0];
       if (!allowedDates.has(txDateStr)) continue;
       
