@@ -96,7 +96,17 @@ export async function registerRoutes(
   app.post("/api/transactions", async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.parse(req.body);
-      const transaction = await storage.createTransaction(validatedData);
+      
+      // Generate fingerprint for duplicate detection
+      const date = new Date(validatedData.date);
+      const fingerprint = createTransactionFingerprint(
+        date,
+        validatedData.amount,
+        validatedData.description,
+        validatedData.reference || null
+      );
+      
+      const transaction = await storage.createTransactionWithFingerprint(validatedData, fingerprint);
       res.status(201).json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -197,7 +207,10 @@ export async function registerRoutes(
           category = cats[Math.floor(Math.random() * cats.length)];
         }
 
-        const transaction = await storage.createTransaction({
+        // Generate fingerprint for duplicate detection
+        const fingerprint = createTransactionFingerprint(date, amount, merchant.name, null);
+        
+        const transaction = await storage.createTransactionWithFingerprint({
           userId: null,
           date,
           description: merchant.name,
@@ -208,7 +221,7 @@ export async function registerRoutes(
           businessType: merchant.businessType || null,
           status: 'Cleared',
           tags: [],
-        });
+        }, fingerprint);
 
         created.push(transaction);
       }
