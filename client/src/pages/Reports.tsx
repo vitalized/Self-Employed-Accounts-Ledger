@@ -279,36 +279,27 @@ export default function Reports() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle>Expense Breakdown</CardTitle>
               <CardDescription>Where your money is going</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] flex items-center justify-center">
-                {expenseData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={expenseData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {expenseData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `£${value.toLocaleString()}`} />
-                      <Legend layout="vertical" verticalAlign="middle" align="right" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                   <div className="text-muted-foreground text-sm">No expense data for this period</div>
-                )}
-              </div>
+              {expenseData.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {expenseData.map((item, index) => (
+                    <div key={item.name} className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="text-sm text-muted-foreground">£{item.value.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-sm">No expense data for this period</div>
+              )}
             </CardContent>
           </Card>
         </div>
