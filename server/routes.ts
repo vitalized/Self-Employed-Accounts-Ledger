@@ -8,6 +8,14 @@ import crypto from "crypto";
 const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
 const STARLING_SANDBOX_API_BASE = "https://api-sandbox.starlingbank.com/api/v2";
 
+// Shared utility to create transaction fingerprint for duplicate detection
+function createTransactionFingerprint(date: Date, amount: string | number, description: string, reference: string | null): string {
+  const dateStr = date.toISOString().split('T')[0];
+  const amountNum = typeof amount === 'string' ? parseFloat(amount) : amount;
+  const normalized = `${dateStr}|${amountNum.toFixed(2)}|${description.toLowerCase().trim()}|${(reference || '').toLowerCase().trim()}`;
+  return crypto.createHash('sha256').update(normalized).digest('hex').substring(0, 32);
+}
+
 // Token encryption for secure storage
 const ALGORITHM = "aes-256-cbc";
 
@@ -550,11 +558,17 @@ export async function registerRoutes(
             category = ruleMatch.category;
           }
 
-          await storage.createTransaction({
+          // Generate fingerprint for duplicate detection
+          const txDate = new Date(item.transactionTime);
+          const txDescription = item.counterPartyName || item.reference || "Unknown";
+          const txReference = item.reference || null;
+          const fingerprint = createTransactionFingerprint(txDate, amount, txDescription, txReference);
+
+          await storage.createTransactionWithFingerprint({
             userId: null,
-            date: new Date(item.transactionTime),
-            description: item.counterPartyName || item.reference || "Unknown",
-            reference: item.reference || null,
+            date: txDate,
+            description: txDescription,
+            reference: txReference,
             amount: String(amount),
             merchant: item.counterPartyName || "Unknown",
             type: transactionType,
@@ -562,7 +576,7 @@ export async function registerRoutes(
             businessType,
             status: item.status === "SETTLED" ? "Cleared" : "Pending",
             tags: [`starling:${feedItemUid}`],
-          });
+          }, fingerprint);
 
           totalImported++;
         }
@@ -684,6 +698,41 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Backfill fingerprints for existing transactions =====
+  app.post("/api/transactions/backfill-fingerprints", async (req, res) => {
+    try {
+      const allTransactions = await storage.getTransactions();
+      let updated = 0;
+      
+      for (const tx of allTransactions) {
+        // Skip if already has fingerprint
+        if (tx.fingerprint) continue;
+        
+        // Compute fingerprint
+        const fingerprint = createTransactionFingerprint(
+          tx.date,
+          tx.amount,
+          tx.description,
+          tx.reference
+        );
+        
+        // Update transaction with fingerprint
+        await storage.updateTransaction(tx.id, { fingerprint } as any);
+        updated++;
+      }
+      
+      res.json({
+        success: true,
+        updated,
+        total: allTransactions.length,
+        message: `Added fingerprints to ${updated} transactions`
+      });
+    } catch (error) {
+      console.error("Error backfilling fingerprints:", error);
+      res.status(500).json({ error: "Failed to backfill fingerprints" });
+    }
+  });
+
   // ===== CSV Import endpoint =====
   app.post("/api/import/csv", async (req, res) => {
     try {
@@ -708,12 +757,6 @@ export async function registerRoutes(
 
       // Get existing fingerprints to check for duplicates
       const existingFingerprints = await storage.getExistingFingerprints();
-      
-      // Helper to create a fingerprint from transaction data
-      const createFingerprint = (date: string, amount: string, description: string, reference: string): string => {
-        const normalized = `${date}|${parseFloat(amount).toFixed(2)}|${description.toLowerCase().trim()}|${(reference || '').toLowerCase().trim()}`;
-        return crypto.createHash('sha256').update(normalized).digest('hex').substring(0, 32);
-      };
 
       // Parse CSV rows
       const parseCSVLine = (line: string): string[] => {
@@ -776,7 +819,7 @@ export async function registerRoutes(
           }
 
           // Create fingerprint for duplicate detection
-          const fingerprint = createFingerprint(date.toISOString().split('T')[0], String(amount), counterParty, reference);
+          const fingerprint = createTransactionFingerprint(date, amount, counterParty, reference);
           
           // Check if this transaction already exists
           if (existingFingerprints.has(fingerprint)) {
