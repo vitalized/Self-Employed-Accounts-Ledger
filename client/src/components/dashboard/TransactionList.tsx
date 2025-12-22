@@ -309,7 +309,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
       <Table className="w-full table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px] px-4">
+            <TableHead className="w-[100px]">
               <button 
                 onClick={() => toggleSort('date')} 
                 className="flex items-center hover:text-foreground transition-colors"
@@ -318,7 +318,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Date <SortIcon column="date" />
               </button>
             </TableHead>
-            <TableHead className="px-4">
+            <TableHead>
               <button 
                 onClick={() => toggleSort('description')} 
                 className="flex items-center hover:text-foreground transition-colors"
@@ -327,7 +327,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Transaction <SortIcon column="description" />
               </button>
             </TableHead>
-            <TableHead className="text-right px-4">
+            <TableHead className="text-right">
               <button 
                 onClick={() => toggleSort('amount')} 
                 className="flex items-center ml-auto hover:text-foreground transition-colors"
@@ -336,7 +336,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Amount <SortIcon column="amount" />
               </button>
             </TableHead>
-            <TableHead className="w-[120px] px-4">
+            <TableHead className="w-[120px]">
               <button 
                 onClick={() => toggleSort('type')} 
                 className="flex items-center hover:text-foreground transition-colors"
@@ -345,7 +345,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Type <SortIcon column="type" />
               </button>
             </TableHead>
-            <TableHead className="w-[180px] px-4">
+            <TableHead className="w-[180px]">
               <button 
                 onClick={() => toggleSort('category')} 
                 className="flex items-center hover:text-foreground transition-colors"
@@ -354,7 +354,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 Category <SortIcon column="category" />
               </button>
             </TableHead>
-            <TableHead className="w-[150px] px-4">Notes</TableHead>
+            <TableHead className="w-[150px]">Notes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -362,20 +362,20 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
             <TableRow key={t.id} data-testid={`row-transaction-${t.id}`} className={cn(
               t.type === 'Unreviewed' ? "bg-amber-50/50 dark:bg-amber-900/10" : ""
             )}>
-              <TableCell className="font-medium text-muted-foreground px-4">
+              <TableCell className="font-medium text-muted-foreground">
                 {format(parseISO(t.date), 'dd/MM/yyyy')}
               </TableCell>
-              <TableCell className="px-4">
+              <TableCell>
                 <div className="font-medium">{t.description}</div>
                 <div className="text-xs text-muted-foreground">{t.reference || t.merchant}</div>
               </TableCell>
               <TableCell className={cn(
-                "text-right font-bold px-4",
+                "text-right font-bold",
                 t.amount > 0 ? "text-emerald-600" : "text-slate-900 dark:text-slate-100"
               )}>
                 {t.amount > 0 ? '+' : ''}£{Math.abs(t.amount).toFixed(2)}
               </TableCell>
-              <TableCell className="px-4">
+              <TableCell>
                 <div className="inline-flex rounded-md border">
                   <Button 
                     data-testid={`button-type-business-${t.id}`}
@@ -399,7 +399,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                   </Button>
                 </div>
               </TableCell>
-              <TableCell className="px-4">
+              <TableCell>
                 {t.type === 'Unreviewed' ? (
                   <Badge variant="outline" className="border-amber-200 text-amber-700 bg-amber-50">
                     <AlertCircle className="mr-1 h-3 w-3" />
@@ -412,7 +412,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                   >
                     <SelectTrigger 
                       data-testid={`select-category-${t.id}`}
-                      className="h-8 text-xs w-full ml-2"
+                      className="h-8 text-xs"
                     >
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
@@ -432,7 +432,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                   <div className="text-sm text-muted-foreground">-</div>
                 )}
               </TableCell>
-              <TableCell className="px-4">
+              <TableCell>
                 <Input
                   data-testid={`input-note-${t.id}`}
                   placeholder="Add note..."
