@@ -112,6 +112,83 @@ export async function registerRoutes(
     }
   });
 
+  // VAT threshold tracker - calculate rolling 12-month business income
+  app.get("/api/vat-tracker", async (req, res) => {
+    try {
+      const endMonth = req.query.endMonth as string | undefined;
+      const transactions = await storage.getTransactions();
+      
+      // Parse end month or default to current month
+      let endDate: Date;
+      if (endMonth && /^\d{4}-\d{2}$/.test(endMonth)) {
+        const [year, month] = endMonth.split('-').map(Number);
+        endDate = new Date(year, month - 1, 1); // First of the specified month
+      } else {
+        endDate = new Date();
+      }
+      
+      // Calculate the 12-month window
+      const endOfWindow = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0); // Last day of end month
+      const startOfWindow = new Date(endDate.getFullYear(), endDate.getMonth() - 11, 1); // First day, 12 months back
+      
+      // Filter to business income only within the window
+      const businessIncomeTransactions = transactions.filter(tx => {
+        if (tx.type !== 'Business' || tx.businessType !== 'Income') return false;
+        const txDate = new Date(tx.date);
+        return txDate >= startOfWindow && txDate <= endOfWindow;
+      });
+      
+      // Calculate monthly breakdown - only count positive amounts (actual income, not refunds)
+      const monthlyBreakdown: Record<string, number> = {};
+      let totalIncome = 0;
+      
+      for (const tx of businessIncomeTransactions) {
+        const txDate = new Date(tx.date);
+        const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+        const amount = Number(tx.amount);
+        // Only count positive income amounts for VAT threshold
+        if (amount > 0) {
+          monthlyBreakdown[monthKey] = (monthlyBreakdown[monthKey] || 0) + amount;
+          totalIncome += amount;
+        }
+      }
+      
+      // Determine warning status
+      const VAT_THRESHOLD = 90000;
+      const APPROACHING_THRESHOLD = 75000;
+      const DANGER_THRESHOLD = 85000;
+      
+      let status: 'safe' | 'approaching' | 'danger' | 'exceeded';
+      if (totalIncome >= VAT_THRESHOLD) {
+        status = 'exceeded';
+      } else if (totalIncome >= DANGER_THRESHOLD) {
+        status = 'danger';
+      } else if (totalIncome >= APPROACHING_THRESHOLD) {
+        status = 'approaching';
+      } else {
+        status = 'safe';
+      }
+      
+      // Format response
+      const windowStart = `${startOfWindow.getFullYear()}-${String(startOfWindow.getMonth() + 1).padStart(2, '0')}`;
+      const windowEnd = `${endOfWindow.getFullYear()}-${String(endOfWindow.getMonth() + 1).padStart(2, '0')}`;
+      
+      res.json({
+        totalIncome,
+        threshold: VAT_THRESHOLD,
+        percentOfThreshold: Math.round((totalIncome / VAT_THRESHOLD) * 100),
+        status,
+        windowStart,
+        windowEnd,
+        monthlyBreakdown,
+        remainingBeforeVAT: Math.max(0, VAT_THRESHOLD - totalIncome)
+      });
+    } catch (error) {
+      console.error("Error calculating VAT tracker:", error);
+      res.status(500).json({ error: "Failed to calculate VAT tracker" });
+    }
+  });
+
   // Get all transactions
   app.get("/api/transactions", async (req, res) => {
     try {

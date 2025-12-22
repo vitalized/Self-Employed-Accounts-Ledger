@@ -4,6 +4,7 @@ import { StatCards } from "@/components/dashboard/StatCards";
 import { TransactionChart } from "@/components/dashboard/TransactionChart";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { Filters } from "@/components/dashboard/Filters";
+import { VATTracker } from "@/components/dashboard/VATTracker";
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { FilterState, Transaction } from "@/lib/types";
 import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format } from "date-fns";
@@ -243,6 +244,8 @@ export default function Dashboard() {
             Manage your business finances and track tax liability.
           </p>
         </div>
+
+        <VATTracker />
 
         <StatCards 
           transactions={filteredTransactions} 
