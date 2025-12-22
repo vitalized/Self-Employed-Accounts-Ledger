@@ -1,6 +1,6 @@
 import { users, transactions, settings, categorizationRules, transactionNotes, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, ilike } from "drizzle-orm";
+import { eq, and, desc, ilike, between, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -125,33 +125,73 @@ export class DatabaseStorage implements IStorage {
   async findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null): Promise<Transaction | null> {
     // Check for transactions with matching amount, description, reference within +/- 1 day
     // This handles Starling API vs CSV date discrepancies
+    // Use UTC date strings to avoid timezone issues
+    
+    const inputDateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
     const dayBefore = new Date(date);
-    dayBefore.setDate(dayBefore.getDate() - 1);
+    dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
+    const dayBeforeStr = dayBefore.toISOString().split('T')[0];
     const dayAfter = new Date(date);
-    dayAfter.setDate(dayAfter.getDate() + 1);
+    dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
+    const dayAfterStr = dayAfter.toISOString().split('T')[0];
     
-    const allTransactions = await db.select().from(transactions);
+    // Allowed date strings for matching
+    const allowedDates = new Set([dayBeforeStr, inputDateStr, dayAfterStr]);
     
-    for (const tx of allTransactions) {
-      const txDate = new Date(tx.date);
+    const descLower = description.toLowerCase().trim();
+    const refLower = (reference || '').toLowerCase().trim();
+    
+    // Query transactions within date range (more efficient than full table scan)
+    // Compare amounts in application code to handle different string formats
+    const startDate = new Date(dayBeforeStr + 'T00:00:00Z');
+    const endDate = new Date(dayAfterStr + 'T23:59:59Z');
+    
+    const candidates = await db.select()
+      .from(transactions)
+      .where(between(transactions.date, startDate, endDate));
+    
+    for (const tx of candidates) {
+      // Check amount matches (parse to number to handle different string formats like "100" vs "100.00")
       const txAmount = parseFloat(tx.amount);
-      
-      // Check if within date range (+/- 1 day)
-      if (txDate < dayBefore || txDate > dayAfter) continue;
-      
-      // Check amount matches (using fixed precision to avoid floating point issues)
       if (Math.abs(txAmount - amount) > 0.01) continue;
       
       // Check description matches (case-insensitive)
-      if (tx.description.toLowerCase().trim() !== description.toLowerCase().trim()) continue;
+      if (tx.description.toLowerCase().trim() !== descLower) continue;
       
       // Check reference matches (case-insensitive, treat null/empty as equivalent)
       const txRef = (tx.reference || '').toLowerCase().trim();
-      const inputRef = (reference || '').toLowerCase().trim();
-      if (txRef !== inputRef) continue;
+      if (txRef !== refLower) continue;
       
-      // Found a potential duplicate
-      return tx;
+      // Check if transaction date falls within allowed dates (using UTC date string)
+      const txDateStr = new Date(tx.date).toISOString().split('T')[0];
+      if (!allowedDates.has(txDateStr)) continue;
+      
+      // Only consider as duplicate if:
+      // 1. Exact same date (definitely a duplicate), OR
+      // 2. Different date but the existing transaction is from Starling API (not CSV import)
+      //    AND the existing transaction's time is near end-of-day (>=22:00) or start-of-day (<02:00)
+      //    This handles Starling API timestamps near midnight showing as next day in CSV
+      //    while allowing legitimate mid-day consecutive-day transactions
+      const isSameDate = txDateStr === inputDateStr;
+      const existingIsFromCSV = tx.tags && tx.tags.includes('import:csv');
+      
+      if (isSameDate) {
+        // Exact same date - definitely a duplicate
+        return tx;
+      }
+      
+      if (!existingIsFromCSV) {
+        // Existing is from API, check if it's near day boundary (where date mismatches occur)
+        const txTime = new Date(tx.date);
+        const hours = txTime.getUTCHours();
+        const isNearDayBoundary = hours >= 22 || hours < 2; // Near midnight
+        
+        if (isNearDayBoundary) {
+          // API transaction near midnight could show as different day in CSV - treat as duplicate
+          return tx;
+        }
+      }
+      // Otherwise, it's likely a legitimate consecutive-day transaction
     }
     
     return null;
