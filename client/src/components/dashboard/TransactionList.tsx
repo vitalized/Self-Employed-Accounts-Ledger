@@ -376,7 +376,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 {t.amount > 0 ? '+' : ''}£{Math.abs(t.amount).toFixed(2)}
               </TableCell>
               <TableCell className="px-4">
-                <div className="inline-flex rounded-md border">
+                <div className="inline-flex rounded-md border mr-2">
                   <Button 
                     data-testid={`button-type-business-${t.id}`}
                     variant={t.type === 'Business' ? 'default' : 'ghost'} 
