@@ -9,7 +9,14 @@ import {
   Sun,
   Moon,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  TrendingUp,
+  Wallet,
+  Calculator,
+  ReceiptText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -20,25 +27,44 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
+const reportSubItems = [
+  { href: "/reports/sa103f", label: "SA103F Summary", icon: FileText },
+  { href: "/reports/profit-loss", label: "Profit & Loss", icon: TrendingUp },
+  { href: "/reports/expenses", label: "Expense Breakdown", icon: Wallet },
+  { href: "/reports/tax-calculator", label: "Tax Calculator", icon: Calculator },
+  { href: "/reports/vat", label: "VAT Summary", icon: ReceiptText },
+];
+
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [reportsExpanded, setReportsExpanded] = useState(() => location.startsWith('/reports'));
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (location.startsWith('/reports')) {
+      setReportsExpanded(true);
+    }
+  }, [location]);
+
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
-  const links = [
+  const mainLinks = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/transactions", label: "Transactions", icon: Receipt },
-    { href: "/reports", label: "Reports", icon: PieChart },
+  ];
+
+  const bottomLinks = [
     { href: "/settings", label: "Settings", icon: Settings },
   ];
+
+  const isReportsActive = location.startsWith('/reports');
 
   return (
     <div className={cn(
@@ -75,7 +101,94 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       
       <div className="flex-1 overflow-y-auto py-4">
         <nav className={cn("space-y-1", collapsed ? "px-2" : "px-3")}>
-          {links.map((link) => {
+          {mainLinks.map((link) => {
+            const Icon = link.icon;
+            const isActive = location === link.href;
+            return (
+              <Link 
+                key={link.href} 
+                href={link.href}
+                className={cn(
+                  "flex items-center rounded-md py-2 text-sm font-medium transition-colors",
+                  collapsed ? "justify-center px-2" : "px-3",
+                  isActive 
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+                data-testid={`nav-${link.label.toLowerCase()}`}
+                title={collapsed ? link.label : undefined}
+              >
+                <Icon className={cn("h-5 w-5", !collapsed && "mr-3")} />
+                {!collapsed && link.label}
+              </Link>
+            );
+          })}
+
+          {collapsed ? (
+            <Link 
+              href="/reports/sa103f"
+              className={cn(
+                "flex items-center rounded-md py-2 text-sm font-medium transition-colors justify-center px-2",
+                isReportsActive 
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              )}
+              data-testid="nav-reports"
+              title="Reports"
+            >
+              <PieChart className="h-5 w-5" />
+            </Link>
+          ) : (
+            <div>
+              <button
+                onClick={() => setReportsExpanded(!reportsExpanded)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-md py-2 px-3 text-sm font-medium transition-colors",
+                  isReportsActive 
+                    ? "bg-sidebar-primary/50 text-sidebar-primary-foreground" 
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+                data-testid="nav-reports-toggle"
+              >
+                <div className="flex items-center">
+                  <PieChart className="h-5 w-5 mr-3" />
+                  Reports
+                </div>
+                {reportsExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+              
+              {reportsExpanded && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                  {reportSubItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center rounded-md py-1.5 px-2 text-sm transition-colors",
+                          isActive 
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium" 
+                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                        data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <Icon className="h-4 w-4 mr-2" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {bottomLinks.map((link) => {
             const Icon = link.icon;
             const isActive = location === link.href;
             return (

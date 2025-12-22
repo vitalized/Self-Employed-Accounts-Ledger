@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { useRoute, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
@@ -6,7 +7,6 @@ import { parseISO, isWithinInterval, startOfMonth, endOfMonth, subMonths, startO
 import { useTransactions } from "@/lib/queries";
 import { useDataMode } from "@/lib/dataContext";
 import { useQuery } from "@tanstack/react-query";
-import { ReportsLayout, REPORT_DEFINITIONS } from "@/components/reports/ReportsLayout";
 import { SA103FReport } from "@/components/reports/SA103FReport";
 import { ProfitLossReport } from "@/components/reports/ProfitLossReport";
 import { ExpenseBreakdownReport } from "@/components/reports/ExpenseBreakdownReport";
@@ -14,18 +14,21 @@ import { TaxCalculatorReport } from "@/components/reports/TaxCalculatorReport";
 import { VATSummaryReport } from "@/components/reports/VATSummaryReport";
 import { Calendar } from "lucide-react";
 
+const REPORT_TITLES: Record<string, { title: string; description: string }> = {
+  'sa103f': { title: 'SA103F Summary', description: 'Self-assessment tax return summary based on HMRC categories' },
+  'profit-loss': { title: 'Profit & Loss', description: 'Income and expense statement for your business' },
+  'expenses': { title: 'Expense Breakdown', description: 'Detailed analysis of your business expenses by category' },
+  'tax-calculator': { title: 'Tax Calculator', description: 'UK income tax and National Insurance calculator' },
+  'vat': { title: 'VAT Summary', description: 'VAT threshold tracking and registration status' },
+};
+
 export default function Reports() {
+  const [, params] = useRoute("/reports/:reportId");
+  const [, setLocation] = useLocation();
+  const reportId = params?.reportId || 'sa103f';
+  
   const [dateRange, setDateRange] = useState('this-month');
   const [hasInitializedTaxYear, setHasInitializedTaxYear] = useState(false);
-  const [selectedReport, setSelectedReport] = useState('sa103f');
-  const [pinnedReports, setPinnedReports] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('pinnedReports');
-      return saved ? JSON.parse(saved) : ['sa103f'];
-    } catch {
-      return ['sa103f'];
-    }
-  });
 
   const { useMockData } = useDataMode();
   const { data: apiTransactions = [], isLoading } = useTransactions();
@@ -47,8 +50,10 @@ export default function Reports() {
   }, [taxYears, hasInitializedTaxYear]);
 
   useEffect(() => {
-    localStorage.setItem('pinnedReports', JSON.stringify(pinnedReports));
-  }, [pinnedReports]);
+    if (!params?.reportId) {
+      setLocation('/reports/sa103f', { replace: true });
+    }
+  }, [params?.reportId, setLocation]);
   
   const transactions = useMockData ? MOCK_TRANSACTIONS : apiTransactions;
 
@@ -100,27 +105,19 @@ export default function Reports() {
     });
   }, [transactions, currentRange]);
 
-  const handleTogglePinned = (reportId: string) => {
-    setPinnedReports(prev => 
-      prev.includes(reportId) 
-        ? prev.filter(id => id !== reportId)
-        : [...prev, reportId]
-    );
-  };
-
   const renderReport = () => {
     const yearLabel = getYearLabel(dateRange);
     
-    switch (selectedReport) {
+    switch (reportId) {
       case 'sa103f':
         return <SA103FReport transactions={filteredTransactions} yearLabel={yearLabel} />;
       case 'profit-loss':
         return <ProfitLossReport transactions={filteredTransactions} yearLabel={yearLabel} />;
-      case 'expense-breakdown':
+      case 'expenses':
         return <ExpenseBreakdownReport transactions={filteredTransactions} yearLabel={yearLabel} />;
       case 'tax-calculator':
         return <TaxCalculatorReport transactions={filteredTransactions} yearLabel={yearLabel} />;
-      case 'vat-summary':
+      case 'vat':
         return <VATSummaryReport transactions={filteredTransactions} yearLabel={yearLabel} />;
       default:
         return <SA103FReport transactions={filteredTransactions} yearLabel={yearLabel} />;
@@ -137,16 +134,16 @@ export default function Reports() {
     );
   }
 
-  const currentReportDef = REPORT_DEFINITIONS.find(r => r.id === selectedReport);
+  const currentReportInfo = REPORT_TITLES[reportId] || REPORT_TITLES['sa103f'];
 
   return (
     <DashboardLayout>
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between px-6 py-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Reports</h2>
+            <h2 className="text-2xl font-bold tracking-tight">{currentReportInfo.title}</h2>
             <p className="text-sm text-muted-foreground">
-              {currentReportDef?.description || 'Financial reports and analysis'}
+              {currentReportInfo.description}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -169,14 +166,9 @@ export default function Reports() {
           </div>
         </div>
 
-        <ReportsLayout
-          selectedReport={selectedReport}
-          onSelectReport={setSelectedReport}
-          pinnedReports={pinnedReports}
-          onTogglePinned={handleTogglePinned}
-        >
+        <div className="flex-1 overflow-y-auto">
           {renderReport()}
-        </ReportsLayout>
+        </div>
       </div>
     </DashboardLayout>
   );
