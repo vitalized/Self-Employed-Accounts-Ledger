@@ -126,7 +126,11 @@ export default function Dashboard() {
 
       // Type Filter
       if (filters.type && filters.type !== 'All') {
-        if (filters.type === 'Business') {
+        if (filters.type === 'Unreviewed') {
+          // Include transactions that are Unreviewed OR Business without a category
+          const needsReview = t.type === 'Unreviewed' || (t.type === 'Business' && !t.category);
+          if (!needsReview) return false;
+        } else if (filters.type === 'Business') {
           if (t.type !== 'Business') return false;
         } else if (filters.type === 'Business Income') {
           if (t.type !== 'Business' || t.businessType !== 'Income') return false;
