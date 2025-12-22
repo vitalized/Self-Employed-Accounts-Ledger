@@ -86,17 +86,33 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
 
     let taxableIncome = Math.max(0, netProfit - 12570);
     let incomeTax = 0;
+    let taxBreakdown: { band: string; rate: string; amount: number; tax: number }[] = [];
+    
     if (taxableIncome > 0) {
       const basicRateLimit = 37700;
       const basicTaxable = Math.min(taxableIncome, basicRateLimit);
-      incomeTax += basicTaxable * 0.20;
+      const basicTax = basicTaxable * 0.20;
+      incomeTax += basicTax;
+      if (basicTaxable > 0) {
+        taxBreakdown.push({ band: 'Basic Rate', rate: '20%', amount: basicTaxable, tax: basicTax });
+      }
+      
       if (taxableIncome > basicRateLimit) {
         const higherRateLimit = 125140 - 50270;
         const higherTaxable = Math.min(taxableIncome - basicRateLimit, higherRateLimit);
-        incomeTax += higherTaxable * 0.40;
+        const higherTax = higherTaxable * 0.40;
+        incomeTax += higherTax;
+        if (higherTaxable > 0) {
+          taxBreakdown.push({ band: 'Higher Rate', rate: '40%', amount: higherTaxable, tax: higherTax });
+        }
+        
         if (taxableIncome > basicRateLimit + higherRateLimit) {
           const additionalTaxable = taxableIncome - basicRateLimit - higherRateLimit;
-          incomeTax += additionalTaxable * 0.45;
+          const additionalTax = additionalTaxable * 0.45;
+          incomeTax += additionalTax;
+          if (additionalTaxable > 0) {
+            taxBreakdown.push({ band: 'Additional Rate', rate: '45%', amount: additionalTaxable, tax: additionalTax });
+          }
         }
       }
     }
@@ -124,6 +140,8 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       disallowable,
       totalDisallowable,
       netProfit,
+      taxableIncome,
+      taxBreakdown,
       tax: {
         incomeTax: Math.round(incomeTax),
         class4NI: Math.round(class4NI),
@@ -316,6 +334,16 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
     </div>
   );
 
+  const IncomeRow = ({ label, box, value, isTotal = false }: { label: string; box?: string; value: number; isTotal?: boolean }) => (
+    <div className={`flex items-center py-2 text-sm ${isTotal ? 'border-t border-b-2 border-solid border-gray-900 dark:border-gray-100 font-bold py-3 text-base' : 'border-b border-dashed border-gray-100 dark:border-gray-800'}`}>
+      <div className="flex-1 pr-4">{label}</div>
+      <div className="w-32 text-right flex items-center justify-end gap-2">
+        <span>£{value.toLocaleString()}</span>
+        {box && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{box}</span>}
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-6" ref={cardRef}>
       <div className="flex items-center justify-between">
@@ -342,28 +370,71 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       <Tabs defaultValue="summary" className="w-full">
         <TabsList data-testid="tabs-sa103f">
           <TabsTrigger value="summary" data-testid="tab-summary">Summary</TabsTrigger>
+          <TabsTrigger value="tax" data-testid="tab-tax">Tax</TabsTrigger>
           <TabsTrigger value="charts" data-testid="tab-charts">Charts</TabsTrigger>
-          <TabsTrigger value="details" data-testid="tab-details">Details</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Income</CardTitle>
+              <CardDescription>SA103F Boxes 15-16</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IncomeRow label="Your turnover - the takings, fees, sales or money earned by your business" box="15" value={data.turnover} />
+              <IncomeRow label="Any other business income not included in box 15" box="16" value={data.otherIncome} />
+              <IncomeRow label="TOTAL BUSINESS INCOME" value={data.totalIncome} isTotal />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Expenses</CardTitle>
+              <CardDescription>SA103F Boxes 17-31 (Allowable) and 32-46 (Disallowable)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="flex items-end justify-between mb-2">
+                  <div className="flex-1" />
+                  <div className="flex text-xs font-bold text-gray-500 uppercase">
+                    <div className="w-24 text-right mr-4">Allowable</div>
+                    <div className="w-24 text-right">Disallowable</div>
+                  </div>
+                </div>
+                <Row label="Cost of goods bought for resale or goods used" valAllowable={data.expenses.costOfGoods} boxAllowable="17" valDisallowable={0} boxDisallowable="32" />
+                <Row label="Construction industry - payments to subcontractors" valAllowable={data.expenses.construction} boxAllowable="18" valDisallowable={0} boxDisallowable="33" />
+                <Row label="Wages, salaries and other staff costs" valAllowable={data.expenses.wages} boxAllowable="19" valDisallowable={0} boxDisallowable="34" />
+                <Row label="Car, van and travel expenses" valAllowable={data.expenses.travel} boxAllowable="20" valDisallowable={data.disallowable.travel} boxDisallowable="35" />
+                <Row label="Rent, rates, power and insurance costs" valAllowable={data.expenses.rent} boxAllowable="21" valDisallowable={0} boxDisallowable="36" />
+                <Row label="Repairs and renewals of property and equipment" valAllowable={data.expenses.repairs} boxAllowable="22" valDisallowable={0} boxDisallowable="37" />
+                <Row label="Phone, fax, stationery and other office costs" valAllowable={data.expenses.admin} boxAllowable="23" valDisallowable={0} boxDisallowable="38" />
+                <Row label="Advertising and business entertainment costs" valAllowable={data.expenses.advertising} boxAllowable="24" valDisallowable={data.disallowable.advertising} boxDisallowable="39" />
+                <Row label="Interest on bank and other loans" valAllowable={data.expenses.interest} boxAllowable="25" valDisallowable={0} boxDisallowable="40" />
+                <Row label="Bank, credit card and other financial charges" valAllowable={data.expenses.bankCharges} boxAllowable="26" valDisallowable={0} boxDisallowable="41" />
+                <Row label="Irrecoverable debts written off" valAllowable={data.expenses.badDebts} boxAllowable="27" valDisallowable={0} boxDisallowable="42" />
+                <Row label="Accountancy, legal and other professional fees" valAllowable={data.expenses.professional} boxAllowable="28" valDisallowable={0} boxDisallowable="43" />
+                <Row label="Depreciation and loss/profit on sale of assets" valAllowable={data.expenses.depreciation} boxAllowable="29" valDisallowable={0} boxDisallowable="44" />
+                <Row label="Other business expenses" valAllowable={data.expenses.other} boxAllowable="30" valDisallowable={data.disallowable.other} boxDisallowable="45" />
+                <Row label="TOTAL EXPENSES" valAllowable={data.totalExpenses} boxAllowable="31" valDisallowable={data.totalDisallowable} boxDisallowable="46" isTotal />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Net Profit or Loss</CardTitle>
+              <CardDescription>SA103F Box 47</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IncomeRow label="Total business income" value={data.totalIncome} />
+              <IncomeRow label="Less: Total allowable expenses" box="31" value={data.totalExpenses} />
+              <IncomeRow label="NET PROFIT" box="47" value={data.netProfit} isTotal />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tax" className="mt-6 space-y-6">
           <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">£{data.totalIncome.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">£{data.totalExpenses.toLocaleString()}</div>
-              </CardContent>
-            </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
@@ -374,7 +445,23 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Est. Tax</CardTitle>
+                <CardTitle className="text-sm font-medium">Income Tax</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">£{data.tax.incomeTax.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">National Insurance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">£{(data.tax.class4NI + data.tax.class2NI).toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total Tax Due</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-orange-600">£{data.tax.total.toLocaleString()}</div>
@@ -384,26 +471,88 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Tax Breakdown</CardTitle>
-              <CardDescription>Estimated UK income tax and National Insurance</CardDescription>
+              <CardTitle>Income Tax Breakdown</CardTitle>
+              <CardDescription>UK income tax calculation based on current rates</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between py-2 border-b text-sm">
+                  <span className="text-muted-foreground">Net Profit</span>
+                  <span>£{data.netProfit.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b text-sm">
+                  <span className="text-muted-foreground">Personal Allowance</span>
+                  <span className="text-green-600">-£12,570</span>
+                </div>
+                <div className="flex justify-between py-2 border-b font-medium">
+                  <span>Taxable Income</span>
+                  <span>£{data.taxableIncome.toLocaleString()}</span>
+                </div>
+                
+                {data.taxBreakdown.map((band, i) => (
+                  <div key={i} className="flex justify-between py-2 border-b text-sm">
+                    <span>
+                      <span className="text-muted-foreground">{band.band} ({band.rate})</span>
+                      <span className="ml-2 text-xs text-muted-foreground">on £{band.amount.toLocaleString()}</span>
+                    </span>
+                    <span>£{Math.round(band.tax).toLocaleString()}</span>
+                  </div>
+                ))}
+
+                <div className="flex justify-between py-3 border-t-2 font-bold text-lg">
+                  <span>Total Income Tax</span>
+                  <span className="text-orange-600">£{data.tax.incomeTax.toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>National Insurance</CardTitle>
+              <CardDescription>Self-employed NI contributions</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between py-2 border-b">
-                  <span>Income Tax</span>
-                  <span className="font-medium">£{data.tax.incomeTax.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>Class 4 National Insurance</span>
+                  <div>
+                    <span className="font-medium">Class 4 NI</span>
+                    <p className="text-xs text-muted-foreground">9% on profits between £12,570 and £50,270, 2% above</p>
+                  </div>
                   <span className="font-medium">£{data.tax.class4NI.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b">
-                  <span>Class 2 National Insurance</span>
+                  <div>
+                    <span className="font-medium">Class 2 NI</span>
+                    <p className="text-xs text-muted-foreground">£3.45/week if profits above £6,725</p>
+                  </div>
                   <span className="font-medium">£{data.tax.class2NI.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between py-3 border-t-2 font-bold text-lg">
-                  <span>Total Tax Liability</span>
-                  <span className="text-orange-600">£{data.tax.total.toLocaleString()}</span>
+                  <span>Total NI</span>
+                  <span className="text-orange-600">£{(data.tax.class4NI + data.tax.class2NI).toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>What You Keep</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between py-2 border-b">
+                  <span>Net Profit</span>
+                  <span className="font-medium">£{data.netProfit.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span>Total Tax & NI</span>
+                  <span className="font-medium text-orange-600">-£{data.tax.total.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between py-3 border-t-2 font-bold text-lg">
+                  <span>Take Home</span>
+                  <span className="text-green-600">£{(data.netProfit - data.tax.total).toLocaleString()}</span>
                 </div>
               </div>
             </CardContent>
@@ -432,41 +581,6 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
                     <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="details" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>SA103F Expense Categories</CardTitle>
-              <CardDescription>Detailed breakdown by HMRC category</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <div className="flex items-end justify-between mb-2">
-                  <div className="flex-1" />
-                  <div className="flex text-xs font-bold text-gray-500 uppercase">
-                    <div className="w-24 text-right mr-4">Allowable</div>
-                    <div className="w-24 text-right">Disallowable</div>
-                  </div>
-                </div>
-                <Row label="Cost of goods bought for resale" valAllowable={data.expenses.costOfGoods} boxAllowable="17" valDisallowable={0} boxDisallowable="32" />
-                <Row label="Construction industry subcontractors" valAllowable={data.expenses.construction} boxAllowable="18" valDisallowable={0} boxDisallowable="33" />
-                <Row label="Wages, salaries and staff costs" valAllowable={data.expenses.wages} boxAllowable="19" valDisallowable={0} boxDisallowable="34" />
-                <Row label="Car, van and travel expenses" valAllowable={data.expenses.travel} boxAllowable="20" valDisallowable={data.disallowable.travel} boxDisallowable="35" />
-                <Row label="Rent, rates, power and insurance" valAllowable={data.expenses.rent} boxAllowable="21" valDisallowable={0} boxDisallowable="36" />
-                <Row label="Repairs and renewals" valAllowable={data.expenses.repairs} boxAllowable="22" valDisallowable={0} boxDisallowable="37" />
-                <Row label="Phone, stationery, office costs" valAllowable={data.expenses.admin} boxAllowable="23" valDisallowable={0} boxDisallowable="38" />
-                <Row label="Advertising and entertainment" valAllowable={data.expenses.advertising} boxAllowable="24" valDisallowable={data.disallowable.advertising} boxDisallowable="39" />
-                <Row label="Interest on loans" valAllowable={data.expenses.interest} boxAllowable="25" valDisallowable={0} boxDisallowable="40" />
-                <Row label="Bank and financial charges" valAllowable={data.expenses.bankCharges} boxAllowable="26" valDisallowable={0} boxDisallowable="41" />
-                <Row label="Irrecoverable debts" valAllowable={data.expenses.badDebts} boxAllowable="27" valDisallowable={0} boxDisallowable="42" />
-                <Row label="Professional fees" valAllowable={data.expenses.professional} boxAllowable="28" valDisallowable={0} boxDisallowable="43" />
-                <Row label="Depreciation" valAllowable={data.expenses.depreciation} boxAllowable="29" valDisallowable={0} boxDisallowable="44" />
-                <Row label="Other expenses" valAllowable={data.expenses.other} boxAllowable="30" valDisallowable={data.disallowable.other} boxDisallowable="45" />
-                <Row label="TOTAL EXPENSES" valAllowable={data.totalExpenses} boxAllowable="31" valDisallowable={data.totalDisallowable} boxDisallowable="46" isTotal />
               </div>
             </CardContent>
           </Card>
