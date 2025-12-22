@@ -390,16 +390,7 @@ export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, t
   return (
     <Card className="print:shadow-none" ref={cardRef}>
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-start mb-4">
-             <div>
-                <CardTitle className="text-2xl">Self-Assessment Summary {yearLabel}</CardTitle>
-                <CardDescription>Based on SA103F categories</CardDescription>
-             </div>
-             <div className="text-right text-sm text-muted-foreground">
-                6 April {yearLabel.split('-')[0]} - 5 April 20{yearLabel.split('-')[1]}
-             </div>
-        </div>
-        <div className="flex items-center justify-between gap-4 pt-2 border-t print:hidden" data-testid="tax-summary-toolbar">
+        <div className="flex items-center justify-between gap-4 pb-4 mb-4 border-b print:hidden" data-testid="tax-summary-toolbar">
              <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 {setDateRange && taxYears.length > 0 ? (
@@ -447,6 +438,15 @@ export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, t
                   <FileText className="h-4 w-4 mr-1" />
                   PDF
                 </Button>
+             </div>
+        </div>
+        <div className="flex justify-between items-start">
+             <div>
+                <CardTitle className="text-2xl">Self-Assessment Summary {yearLabel}</CardTitle>
+                <CardDescription>Based on SA103F categories</CardDescription>
+             </div>
+             <div className="text-right text-sm text-muted-foreground">
+                6 April {yearLabel.split('-')[0]} - 5 April 20{yearLabel.split('-')[1]}
              </div>
         </div>
       </CardHeader>
