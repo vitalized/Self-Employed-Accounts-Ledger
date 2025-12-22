@@ -284,17 +284,17 @@ export default function Reports() {
               <CardDescription>Where your money is going</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] flex items-center justify-center">
+              <div className="h-[200px] flex items-center justify-center">
                 {expenseData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={expenseData}
-                        cx="50%"
+                        cx="30%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={3}
                         dataKey="value"
                       >
                         {expenseData.map((entry, index) => (
