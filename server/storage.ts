@@ -16,6 +16,7 @@ export interface IStorage {
   updateTransaction(id: string, updates: UpdateTransaction): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<boolean>;
   getExistingFingerprints(): Promise<Set<string>>;
+  findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null): Promise<Transaction | null>;
   
   // Settings methods
   getSetting(key: string): Promise<Settings | undefined>;
@@ -119,6 +120,41 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return fingerprints;
+  }
+
+  async findPotentialDuplicate(date: Date, amount: number, description: string, reference: string | null): Promise<Transaction | null> {
+    // Check for transactions with matching amount, description, reference within +/- 1 day
+    // This handles Starling API vs CSV date discrepancies
+    const dayBefore = new Date(date);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    const dayAfter = new Date(date);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    
+    const allTransactions = await db.select().from(transactions);
+    
+    for (const tx of allTransactions) {
+      const txDate = new Date(tx.date);
+      const txAmount = parseFloat(tx.amount);
+      
+      // Check if within date range (+/- 1 day)
+      if (txDate < dayBefore || txDate > dayAfter) continue;
+      
+      // Check amount matches (using fixed precision to avoid floating point issues)
+      if (Math.abs(txAmount - amount) > 0.01) continue;
+      
+      // Check description matches (case-insensitive)
+      if (tx.description.toLowerCase().trim() !== description.toLowerCase().trim()) continue;
+      
+      // Check reference matches (case-insensitive, treat null/empty as equivalent)
+      const txRef = (tx.reference || '').toLowerCase().trim();
+      const inputRef = (reference || '').toLowerCase().trim();
+      if (txRef !== inputRef) continue;
+      
+      // Found a potential duplicate
+      return tx;
+    }
+    
+    return null;
   }
 
   async updateTransaction(id: string, updates: UpdateTransaction): Promise<Transaction | undefined> {

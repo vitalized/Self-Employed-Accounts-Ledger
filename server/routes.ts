@@ -834,8 +834,15 @@ export async function registerRoutes(
           // Create fingerprint for duplicate detection
           const fingerprint = createTransactionFingerprint(date, amount, counterParty, reference);
           
-          // Check if this transaction already exists
+          // Check if this transaction already exists (exact fingerprint match)
           if (existingFingerprints.has(fingerprint)) {
+            skipped++;
+            continue;
+          }
+          
+          // Also check for potential duplicates within +/- 1 day (handles Starling API vs CSV date discrepancy)
+          const potentialDuplicate = await storage.findPotentialDuplicate(date, amount, counterParty, reference);
+          if (potentialDuplicate) {
             skipped++;
             continue;
           }
