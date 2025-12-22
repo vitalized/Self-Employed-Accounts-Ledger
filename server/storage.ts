@@ -12,8 +12,10 @@ export interface IStorage {
   getTransactions(userId?: string): Promise<Transaction[]>;
   getTransaction(id: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
+  createTransactionWithFingerprint(transaction: InsertTransaction, fingerprint: string): Promise<Transaction>;
   updateTransaction(id: string, updates: UpdateTransaction): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<boolean>;
+  getExistingFingerprints(): Promise<Set<string>>;
   
   // Settings methods
   getSetting(key: string): Promise<Settings | undefined>;
@@ -91,6 +93,32 @@ export class DatabaseStorage implements IStorage {
       .values(values)
       .returning();
     return transaction;
+  }
+
+  async createTransactionWithFingerprint(insertTransaction: InsertTransaction, fingerprint: string): Promise<Transaction> {
+    const values = {
+      ...insertTransaction,
+      amount: String(insertTransaction.amount),
+      fingerprint,
+    };
+    
+    const [transaction] = await db
+      .insert(transactions)
+      .values(values)
+      .returning();
+    return transaction;
+  }
+
+  async getExistingFingerprints(): Promise<Set<string>> {
+    const results = await db.select({ fingerprint: transactions.fingerprint })
+      .from(transactions);
+    const fingerprints = new Set<string>();
+    for (const row of results) {
+      if (row.fingerprint) {
+        fingerprints.add(row.fingerprint);
+      }
+    }
+    return fingerprints;
   }
 
   async updateTransaction(id: string, updates: UpdateTransaction): Promise<Transaction | undefined> {

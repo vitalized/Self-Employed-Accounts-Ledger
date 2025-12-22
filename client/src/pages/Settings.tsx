@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, X, Play, ListFilter, Pencil, Check } from "lucide-react";
+import { CheckCircle2, AlertCircle, Building, Download, Trash2, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, X, Play, ListFilter, Pencil, Check, Upload, FileSpreadsheet } from "lucide-react";
 import { useDataMode } from "@/lib/dataContext";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,6 +33,17 @@ export default function Settings() {
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [backfillingRefs, setBackfillingRefs] = useState(false);
 
+  // CSV Import state
+  const [isDragging, setIsDragging] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    skipped: number;
+    categorized: number;
+    total: number;
+    message: string;
+  } | null>(null);
+
   // Rules state
   const [rules, setRules] = useState<CategorizationRule[]>([]);
   const [loadingRules, setLoadingRules] = useState(true);
@@ -50,6 +61,91 @@ export default function Settings() {
     businessType: null as string | null,
     category: null as string | null,
   });
+
+  // CSV Import handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }, []);
+
+  const handleFileUpload = async (file: File) => {
+    if (!file.name.endsWith('.csv')) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a CSV file.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    setImportResult(null);
+
+    try {
+      const csvContent = await file.text();
+      
+      const response = await fetch("/api/import/csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csvContent })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setImportResult({
+          imported: data.imported,
+          skipped: data.skipped,
+          categorized: data.categorized,
+          total: data.total,
+          message: data.message
+        });
+        
+        // Refresh transactions
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+        
+        toast({
+          title: "Import Successful",
+          description: data.message,
+        });
+      } else {
+        toast({
+          title: "Import Failed",
+          description: data.error || "Failed to import CSV.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Import Error",
+        description: "Failed to read or import the CSV file.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Fetch rules on mount
   useEffect(() => {
@@ -526,6 +622,101 @@ export default function Settings() {
                  )}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-green-600" />
+              <CardTitle>CSV Import</CardTitle>
+            </div>
+            <CardDescription>
+              Import transactions from a Starling Bank CSV statement. Duplicates will be automatically detected and skipped.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragging 
+                  ? 'border-green-500 bg-green-50 dark:bg-green-950/20' 
+                  : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
+              }`}
+              data-testid="csv-drop-zone"
+            >
+              {isImporting ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  <p className="text-sm font-medium">Importing transactions...</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className={`h-10 w-10 mx-auto mb-3 ${isDragging ? 'text-green-600' : 'text-gray-400'}`} />
+                  <p className="text-sm font-medium mb-1">
+                    {isDragging ? "Drop CSV file here" : "Drag and drop your CSV file here"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    or click to browse
+                  </p>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="csv-file-input"
+                    data-testid="input-csv-file"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => document.getElementById('csv-file-input')?.click()}
+                    data-testid="button-select-csv"
+                  >
+                    Select CSV File
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {importResult && (
+              <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900 p-4" data-testid="import-result">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-green-800 dark:text-green-200">{importResult.message}</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total rows:</span>
+                        <span className="font-medium">{importResult.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Imported:</span>
+                        <span className="font-medium text-green-600">{importResult.imported}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Duplicates skipped:</span>
+                        <span className="font-medium text-amber-600">{importResult.skipped}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Auto-categorized:</span>
+                        <span className="font-medium text-blue-600">{importResult.categorized}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-900">
+              <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Supported format:</strong> Starling Bank CSV exports with columns Date, Counter Party, Reference, Type, Amount (GBP), Balance (GBP), Spending Category, Notes.
+                Your auto-categorization rules will be applied to imported transactions automatically.
+              </div>
+            </div>
           </CardContent>
         </Card>
 

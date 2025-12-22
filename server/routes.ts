@@ -538,7 +538,8 @@ export async function registerRoutes(
             category,
             businessType,
             status: "Cleared",
-            tags: [],
+            tags: [] as string[],
+            fingerprint: null as string | null,
             createdAt: new Date(),
           };
           
@@ -680,6 +681,177 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error backfilling references:", error);
       res.status(500).json({ error: "Failed to backfill references" });
+    }
+  });
+
+  // ===== CSV Import endpoint =====
+  app.post("/api/import/csv", async (req, res) => {
+    try {
+      const { csvContent } = req.body;
+      
+      if (!csvContent || typeof csvContent !== "string") {
+        return res.status(400).json({ error: "CSV content is required" });
+      }
+
+      // Parse CSV (Starling format: Date,Counter Party,Reference,Type,Amount (GBP),Balance (GBP),Spending Category,Notes)
+      const lines = csvContent.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      
+      if (lines.length < 2) {
+        return res.status(400).json({ error: "CSV must have a header and at least one data row" });
+      }
+
+      // Validate header
+      const header = lines[0].toLowerCase();
+      if (!header.includes('date') || !header.includes('counter party') || !header.includes('amount')) {
+        return res.status(400).json({ error: "Invalid CSV format. Expected Starling Bank statement format." });
+      }
+
+      // Get existing fingerprints to check for duplicates
+      const existingFingerprints = await storage.getExistingFingerprints();
+      
+      // Helper to create a fingerprint from transaction data
+      const createFingerprint = (date: string, amount: string, description: string, reference: string): string => {
+        const normalized = `${date}|${parseFloat(amount).toFixed(2)}|${description.toLowerCase().trim()}|${(reference || '').toLowerCase().trim()}`;
+        return crypto.createHash('sha256').update(normalized).digest('hex').substring(0, 32);
+      };
+
+      // Parse CSV rows
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      let imported = 0;
+      let skipped = 0;
+      let categorized = 0;
+      const errors: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          const fields = parseCSVLine(lines[i]);
+          
+          // Expected fields: Date, Counter Party, Reference, Type, Amount (GBP), Balance (GBP), Spending Category, Notes
+          if (fields.length < 5) {
+            errors.push(`Line ${i + 1}: Not enough fields`);
+            continue;
+          }
+
+          const [dateStr, counterParty, reference, txType, amountStr] = fields;
+          
+          // Parse date (DD/MM/YYYY format)
+          const dateParts = dateStr.split('/');
+          if (dateParts.length !== 3) {
+            errors.push(`Line ${i + 1}: Invalid date format`);
+            continue;
+          }
+          const date = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}T00:00:00Z`);
+          
+          if (isNaN(date.getTime())) {
+            errors.push(`Line ${i + 1}: Invalid date`);
+            continue;
+          }
+
+          // Parse amount - convert comma format if needed and handle negative
+          const cleanAmount = amountStr.replace(/,/g, '').replace(/£/g, '').trim();
+          const amount = parseFloat(cleanAmount);
+          
+          if (isNaN(amount)) {
+            errors.push(`Line ${i + 1}: Invalid amount`);
+            continue;
+          }
+
+          // Create fingerprint for duplicate detection
+          const fingerprint = createFingerprint(date.toISOString().split('T')[0], String(amount), counterParty, reference);
+          
+          // Check if this transaction already exists
+          if (existingFingerprints.has(fingerprint)) {
+            skipped++;
+            continue;
+          }
+
+          // Determine initial transaction type based on amount
+          const isIncome = amount > 0;
+          let type = isIncome ? "Business" : "Unreviewed";
+          let businessType: string | null = isIncome ? "Income" : "Expense";
+          let category: string | null = isIncome ? "Sales" : null;
+
+          // Build temp transaction for rule matching
+          const tempTransaction = {
+            id: "",
+            userId: null,
+            date,
+            description: counterParty,
+            reference: reference || null,
+            amount: String(amount),
+            merchant: counterParty,
+            type,
+            category,
+            businessType,
+            status: "Cleared",
+            tags: [],
+            fingerprint: null,
+            createdAt: new Date(),
+          };
+
+          // Apply categorization rules
+          const ruleMatch = await storage.applyRulesToTransaction(tempTransaction);
+          if (ruleMatch) {
+            type = ruleMatch.type;
+            businessType = ruleMatch.businessType;
+            category = ruleMatch.category;
+            categorized++;
+          }
+
+          // Create the transaction
+          await storage.createTransactionWithFingerprint({
+            userId: null,
+            date,
+            description: counterParty,
+            reference: reference || null,
+            amount: String(amount),
+            merchant: counterParty,
+            type,
+            category,
+            businessType,
+            status: "Cleared",
+            tags: ["import:csv"],
+          }, fingerprint);
+
+          // Add fingerprint to set to prevent duplicates within same import
+          existingFingerprints.add(fingerprint);
+          imported++;
+        } catch (rowError) {
+          errors.push(`Line ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Unknown error'}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        imported,
+        skipped,
+        categorized,
+        total: lines.length - 1,
+        errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+        message: `Imported ${imported} transactions (${skipped} duplicates skipped, ${categorized} auto-categorized)`
+      });
+    } catch (error) {
+      console.error("Error importing CSV:", error);
+      res.status(500).json({ error: "Failed to import CSV" });
     }
   });
 
