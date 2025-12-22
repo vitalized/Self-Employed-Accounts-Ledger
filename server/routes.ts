@@ -460,12 +460,19 @@ export async function registerRoutes(
       for (const transaction of allTransactions) {
         const match = await storage.applyRulesToTransaction(transaction);
         if (match) {
-          await storage.updateTransaction(transaction.id, {
-            type: match.type,
-            businessType: match.businessType,
-            category: match.category,
-          });
-          updated++;
+          // Only count as updated if any field actually changes
+          const typeChanged = transaction.type !== match.type;
+          const businessTypeChanged = transaction.businessType !== match.businessType;
+          const categoryChanged = transaction.category !== match.category;
+          
+          if (typeChanged || businessTypeChanged || categoryChanged) {
+            await storage.updateTransaction(transaction.id, {
+              type: match.type,
+              businessType: match.businessType,
+              category: match.category,
+            });
+            updated++;
+          }
         }
       }
       
