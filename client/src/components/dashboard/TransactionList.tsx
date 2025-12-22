@@ -376,7 +376,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 {t.amount > 0 ? '+' : ''}£{Math.abs(t.amount).toFixed(2)}
               </TableCell>
               <TableCell className="px-4">
-                <div className="inline-flex rounded-md border mr-2">
+                <div className="inline-flex rounded-md border">
                   <Button 
                     data-testid={`button-type-business-${t.id}`}
                     variant={t.type === 'Business' ? 'default' : 'ghost'} 
@@ -412,7 +412,7 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                   >
                     <SelectTrigger 
                       data-testid={`select-category-${t.id}`}
-                      className="h-8 text-xs w-full"
+                      className="h-8 text-xs w-full ml-2"
                     >
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
