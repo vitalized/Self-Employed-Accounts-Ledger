@@ -42,6 +42,7 @@ export default function Settings() {
     categorized: number;
     total: number;
     message: string;
+    skippedTransactions?: Array<{date: string, description: string, amount: number, reason: string}>;
   } | null>(null);
 
   // Rules state
@@ -119,7 +120,8 @@ export default function Settings() {
           skipped: data.skipped,
           categorized: data.categorized,
           total: data.total,
-          message: data.message
+          message: data.message,
+          skippedTransactions: data.skippedTransactions
         });
         
         // Refresh transactions
@@ -685,7 +687,7 @@ export default function Settings() {
               <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900 p-4" data-testid="import-result">
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div>
+                  <div className="w-full">
                     <p className="font-medium text-green-800 dark:text-green-200">{importResult.message}</p>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                       <div className="flex justify-between">
@@ -705,6 +707,27 @@ export default function Settings() {
                         <span className="font-medium text-blue-600">{importResult.categorized}</span>
                       </div>
                     </div>
+                    
+                    {importResult.skippedTransactions && importResult.skippedTransactions.length > 0 && (
+                      <div className="mt-4 border-t border-green-200 dark:border-green-800 pt-3">
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">
+                          Skipped Transactions:
+                        </p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {importResult.skippedTransactions.map((tx, idx) => (
+                            <div key={idx} className="text-xs bg-amber-50 dark:bg-amber-950/30 rounded p-2 border border-amber-200 dark:border-amber-800">
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="font-medium">{tx.date} - {tx.description}</span>
+                                <span className="text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                                  {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)}
+                                </span>
+                              </div>
+                              <p className="text-muted-foreground mt-1">{tx.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -796,6 +796,7 @@ export async function registerRoutes(
       let skipped = 0;
       let categorized = 0;
       const errors: string[] = [];
+      const skippedTransactions: Array<{date: string, description: string, amount: number, reason: string}> = [];
       
       // Track fingerprints of transactions added in this batch
       // This prevents the fuzzy duplicate check from matching newly-imported rows against each other
@@ -841,6 +842,12 @@ export async function registerRoutes(
           // Check if this transaction already exists (exact fingerprint match in DB or current batch)
           if (existingFingerprints.has(fingerprint)) {
             skipped++;
+            skippedTransactions.push({
+              date: dateStr,
+              description: counterParty,
+              amount,
+              reason: "Exact fingerprint match (already imported)"
+            });
             continue;
           }
           
@@ -849,6 +856,13 @@ export async function registerRoutes(
           const potentialDuplicate = await storage.findPotentialDuplicate(date, amount, counterParty, reference, currentBatchFingerprints);
           if (potentialDuplicate) {
             skipped++;
+            const matchDate = new Date(potentialDuplicate.date).toLocaleDateString('en-GB');
+            skippedTransactions.push({
+              date: dateStr,
+              description: counterParty,
+              amount,
+              reason: `Fuzzy match: API transaction on ${matchDate} (${potentialDuplicate.description}, £${potentialDuplicate.amount})`
+            });
             continue;
           }
 
@@ -916,6 +930,7 @@ export async function registerRoutes(
         categorized,
         total: lines.length - 1,
         errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+        skippedTransactions: skippedTransactions.length > 0 ? skippedTransactions : undefined,
         message: `Imported ${imported} transactions (${skipped} duplicates skipped, ${categorized} auto-categorized)`
       });
     } catch (error) {
