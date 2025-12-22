@@ -914,9 +914,10 @@ export async function registerRoutes(
             tags: ["import:csv"],
           }, fingerprint);
 
-          // Add fingerprint to both sets to prevent duplicates within same import
-          existingFingerprints.add(fingerprint);  // For exact match check
-          currentBatchFingerprints.add(fingerprint);  // For fuzzy match exclusion
+          // Add fingerprint to batch set to prevent fuzzy match from matching other CSV rows
+          // Note: We do NOT add to existingFingerprints - CSV is source of truth, so we only
+          // check for duplicates against pre-existing database transactions, not other CSV rows
+          currentBatchFingerprints.add(fingerprint);
           imported++;
         } catch (rowError) {
           errors.push(`Line ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Unknown error'}`);
