@@ -252,8 +252,8 @@ export default function Reports() {
           </Card>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-           <Card className="col-span-1">
+        <div className="grid gap-4">
+           <Card>
             <CardHeader>
               <CardTitle>Profit & Loss</CardTitle>
               <CardDescription>Monthly breakdown of income vs expenses</CardDescription>
@@ -278,7 +278,7 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          <Card className="col-span-1">
+          <Card>
             <CardHeader>
               <CardTitle>Expense Breakdown</CardTitle>
               <CardDescription>Where your money is going</CardDescription>
