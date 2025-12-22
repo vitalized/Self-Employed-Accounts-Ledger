@@ -23,6 +23,7 @@ export const transactions = pgTable("transactions", {
   businessType: text("business_type"), // Income, Expense, Transfer
   status: text("status").notNull().default('Cleared'), // Pending, Cleared
   tags: text("tags").array().default(sql`ARRAY[]::text[]`),
+  fingerprint: text("fingerprint").unique(), // For duplicate detection: date+amount+description+reference hash
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
