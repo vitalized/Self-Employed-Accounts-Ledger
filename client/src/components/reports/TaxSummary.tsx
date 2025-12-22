@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
+import * as XLSX from "xlsx";
 
 interface TaxSummaryProps {
   transactions: Transaction[];
@@ -191,6 +194,173 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
     };
   }, [transactions]);
 
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const getExportData = () => {
+    const startYear = yearLabel.split('-')[0];
+    const endYear = '20' + yearLabel.split('-')[1];
+    
+    return [
+      ['Self-Assessment Summary SA103F', '', '', '', ''],
+      ['Tax Year', `${yearLabel}`, '', '', ''],
+      ['Period', `6 April ${startYear} - 5 April ${endYear}`, '', '', ''],
+      ['', '', '', '', ''],
+      ['BUSINESS INCOME', 'Amount', 'Box', '', ''],
+      ['Your turnover - the takings, fees, sales or money earned by your business', data.turnover, '15', '', ''],
+      ['Any other business income not included in box 15', 0, '16', '', ''],
+      ['TOTAL BUSINESS INCOME', data.totalIncome, '', '', ''],
+      ['', '', '', '', ''],
+      ['BUSINESS EXPENSES', 'Allowable', 'Box', 'Disallowable', 'Box'],
+      ['Cost of goods bought for resale or goods used', data.expenses.costOfGoods, '17', 0, '32'],
+      ['Construction industry - payments to subcontractors', data.expenses.construction, '18', 0, '33'],
+      ['Wages, salaries and other staff costs', data.expenses.wages, '19', 0, '34'],
+      ['Car, van and travel expenses', data.expenses.travel, '20', data.disallowable.travel, '35'],
+      ['Rent, rates, power and insurance costs', data.expenses.rent, '21', 0, '36'],
+      ['Repairs and renewals of property and equipment', data.expenses.repairs, '22', 0, '37'],
+      ['Phone, fax, stationery and other office costs', data.expenses.admin, '23', 0, '38'],
+      ['Advertising and business entertainment costs', data.expenses.advertising, '24', data.disallowable.advertising, '39'],
+      ['Interest on bank and other loans', data.expenses.interest, '25', 0, '40'],
+      ['Bank, credit card and other financial charges', data.expenses.bankCharges, '26', 0, '41'],
+      ['Irrecoverable debts written off', data.expenses.badDebts, '27', 0, '42'],
+      ['Accountancy, legal and other professional fees', data.expenses.professional, '28', 0, '43'],
+      ['Depreciation and loss/profit on sale of assets', data.expenses.depreciation, '29', 0, '44'],
+      ['Other business expenses', data.expenses.other, '30', data.disallowable.other, '45'],
+      ['TOTAL EXPENSES', data.totalExpenses, '31', data.totalDisallowable, '46'],
+      ['', '', '', '', ''],
+      ['NET PROFIT OR LOSS', 'Amount', 'Box', '', ''],
+      ['Total business income', data.totalIncome, '', '', ''],
+      ['Total allowable expenses', data.totalExpenses, '31', '', ''],
+      ['NET PROFIT', data.netProfit, '47', '', ''],
+      ['', '', '', '', ''],
+      ['TAX CALCULATION', 'Amount', '', '', ''],
+      ['Income tax', data.tax.incomeTax, '', '', ''],
+      ['Class 4 National Insurance Contribution', data.tax.class4NI, '', '', ''],
+      ['Class 2 National Insurance Contribution', data.tax.class2NI, '', '', ''],
+      ['TOTAL TAX', data.tax.total, '', '', ''],
+    ];
+  };
+
+  const exportToCSV = () => {
+    const rows = getExportData();
+    const csvContent = rows.map(row => row.map(cell => {
+      const str = String(cell ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    }).join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `SA103F_${yearLabel}.csv`;
+    link.click();
+  };
+
+  const exportToExcel = () => {
+    const rows = getExportData();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 55 }, // Description
+      { wch: 15 }, // Amount/Allowable
+      { wch: 8 },  // Box
+      { wch: 15 }, // Disallowable
+      { wch: 8 },  // Box
+    ];
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'SA103F');
+    XLSX.writeFile(wb, `SA103F_${yearLabel}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    // Create a print-specific view
+    const printContent = cardRef.current;
+    if (!printContent) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const startYear = yearLabel.split('-')[0];
+    const endYear = '20' + yearLabel.split('-')[1];
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>SA103F Self-Assessment ${yearLabel}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
+          h1 { font-size: 24px; margin-bottom: 5px; }
+          h2 { font-size: 14px; color: #666; margin-bottom: 20px; }
+          h3 { font-size: 16px; margin-top: 30px; margin-bottom: 15px; color: #333; }
+          .period { text-align: right; color: #666; font-size: 12px; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th, td { padding: 8px; text-align: left; border-bottom: 1px dashed #ddd; font-size: 13px; }
+          th { font-weight: normal; color: #666; }
+          .amount { text-align: right; }
+          .box { text-align: center; font-size: 10px; color: #999; background: #f5f5f5; padding: 2px 6px; border-radius: 3px; }
+          .total td { border-bottom: 2px solid #333; border-top: 1px solid #333; font-weight: bold; }
+          .header-row { background: #f9f9f9; }
+          .header-row th { font-weight: bold; font-size: 11px; text-transform: uppercase; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <h1>Self-Assessment Summary ${yearLabel}</h1>
+        <h2>Based on SA103F categories</h2>
+        <div class="period">6 April ${startYear} - 5 April ${endYear}</div>
+        
+        <h3>Business income</h3>
+        <table>
+          <tr><td>Your turnover - the takings, fees, sales or money earned by your business</td><td class="amount">£${data.turnover.toLocaleString()}</td><td><span class="box">15</span></td></tr>
+          <tr><td>Any other business income not included in box 15</td><td class="amount">£0</td><td><span class="box">16</span></td></tr>
+          <tr class="total"><td>TOTAL BUSINESS INCOME</td><td class="amount">£${data.totalIncome.toLocaleString()}</td><td></td></tr>
+        </table>
+        
+        <h3>Business expenses</h3>
+        <table>
+          <tr class="header-row"><th></th><th class="amount">Allowable</th><th></th><th class="amount">Disallowable</th><th></th></tr>
+          <tr><td>Cost of goods bought for resale or goods used</td><td class="amount">£${data.expenses.costOfGoods.toLocaleString()}</td><td><span class="box">17</span></td><td class="amount">£0</td><td><span class="box">32</span></td></tr>
+          <tr><td>Construction industry - payments to subcontractors</td><td class="amount">£${data.expenses.construction.toLocaleString()}</td><td><span class="box">18</span></td><td class="amount">£0</td><td><span class="box">33</span></td></tr>
+          <tr><td>Wages, salaries and other staff costs</td><td class="amount">£${data.expenses.wages.toLocaleString()}</td><td><span class="box">19</span></td><td class="amount">£0</td><td><span class="box">34</span></td></tr>
+          <tr><td>Car, van and travel expenses</td><td class="amount">£${data.expenses.travel.toLocaleString()}</td><td><span class="box">20</span></td><td class="amount">£${data.disallowable.travel.toLocaleString()}</td><td><span class="box">35</span></td></tr>
+          <tr><td>Rent, rates, power and insurance costs</td><td class="amount">£${data.expenses.rent.toLocaleString()}</td><td><span class="box">21</span></td><td class="amount">£0</td><td><span class="box">36</span></td></tr>
+          <tr><td>Repairs and renewals of property and equipment</td><td class="amount">£${data.expenses.repairs.toLocaleString()}</td><td><span class="box">22</span></td><td class="amount">£0</td><td><span class="box">37</span></td></tr>
+          <tr><td>Phone, fax, stationery and other office costs</td><td class="amount">£${data.expenses.admin.toLocaleString()}</td><td><span class="box">23</span></td><td class="amount">£0</td><td><span class="box">38</span></td></tr>
+          <tr><td>Advertising and business entertainment costs</td><td class="amount">£${data.expenses.advertising.toLocaleString()}</td><td><span class="box">24</span></td><td class="amount">£${data.disallowable.advertising.toLocaleString()}</td><td><span class="box">39</span></td></tr>
+          <tr><td>Interest on bank and other loans</td><td class="amount">£${data.expenses.interest.toLocaleString()}</td><td><span class="box">25</span></td><td class="amount">£0</td><td><span class="box">40</span></td></tr>
+          <tr><td>Bank, credit card and other financial charges</td><td class="amount">£${data.expenses.bankCharges.toLocaleString()}</td><td><span class="box">26</span></td><td class="amount">£0</td><td><span class="box">41</span></td></tr>
+          <tr><td>Irrecoverable debts written off</td><td class="amount">£${data.expenses.badDebts.toLocaleString()}</td><td><span class="box">27</span></td><td class="amount">£0</td><td><span class="box">42</span></td></tr>
+          <tr><td>Accountancy, legal and other professional fees</td><td class="amount">£${data.expenses.professional.toLocaleString()}</td><td><span class="box">28</span></td><td class="amount">£0</td><td><span class="box">43</span></td></tr>
+          <tr><td>Depreciation and loss/profit on sale of assets</td><td class="amount">£${data.expenses.depreciation.toLocaleString()}</td><td><span class="box">29</span></td><td class="amount">£0</td><td><span class="box">44</span></td></tr>
+          <tr><td>Other business expenses</td><td class="amount">£${data.expenses.other.toLocaleString()}</td><td><span class="box">30</span></td><td class="amount">£${data.disallowable.other.toLocaleString()}</td><td><span class="box">45</span></td></tr>
+          <tr class="total"><td>TOTAL</td><td class="amount">£${data.totalExpenses.toLocaleString()}</td><td><span class="box">31</span></td><td class="amount">£${data.totalDisallowable.toLocaleString()}</td><td><span class="box">46</span></td></tr>
+        </table>
+        
+        <h3>Net profit or loss</h3>
+        <table>
+          <tr><td>Total business income</td><td class="amount">£${data.totalIncome.toLocaleString()}</td><td></td></tr>
+          <tr><td>Total allowable expenses</td><td class="amount">£${data.totalExpenses.toLocaleString()}</td><td><span class="box">31</span></td></tr>
+          <tr class="total"><td>NET PROFIT</td><td class="amount">£${data.netProfit.toLocaleString()}</td><td><span class="box">47</span></td></tr>
+        </table>
+        
+        <h3>Tax</h3>
+        <table>
+          <tr><td>Income tax</td><td class="amount">£${data.tax.incomeTax.toLocaleString()}</td><td></td></tr>
+          <tr><td>Class 4 National Insurance Contribution</td><td class="amount">£${data.tax.class4NI.toLocaleString()}</td><td></td></tr>
+          <tr><td>Class 2 National Insurance Contribution</td><td class="amount">£${data.tax.class2NI.toLocaleString()}</td><td></td></tr>
+          <tr class="total"><td>TOTAL TAX</td><td class="amount">£${data.tax.total.toLocaleString()}</td><td></td></tr>
+        </table>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const Row = ({ label, boxAllowable, valAllowable, boxDisallowable, valDisallowable, isHeader = false, isTotal = false }: any) => (
     <div className={`flex items-center py-2 text-sm ${isHeader ? 'font-semibold text-muted-foreground border-b' : 'border-b border-dashed border-gray-100 dark:border-gray-800'} ${isTotal ? 'border-t border-b-2 border-solid border-gray-900 dark:border-gray-100 font-bold py-3 text-base' : ''}`}>
       <div className="flex-1 pr-4">{label}</div>
@@ -214,15 +384,47 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
   );
 
   return (
-    <Card className="print:shadow-none">
+    <Card className="print:shadow-none" ref={cardRef}>
       <CardHeader>
         <div className="flex justify-between items-start">
              <div>
                 <CardTitle className="text-2xl">Self-Assessment Summary {yearLabel}</CardTitle>
                 <CardDescription>Based on SA103F categories</CardDescription>
              </div>
-             <div className="text-right text-sm text-muted-foreground">
-                6 April {yearLabel.split('-')[0]} - 5 April 20{yearLabel.split('-')[1]}
+             <div className="flex items-center gap-2">
+                <div className="text-right text-sm text-muted-foreground mr-4">
+                   6 April {yearLabel.split('-')[0]} - 5 April 20{yearLabel.split('-')[1]}
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={exportToCSV}
+                  className="print:hidden"
+                  data-testid="button-export-csv"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={exportToExcel}
+                  className="print:hidden"
+                  data-testid="button-export-excel"
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-1" />
+                  Excel
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={exportToPDF}
+                  className="print:hidden"
+                  data-testid="button-export-pdf"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  PDF
+                </Button>
              </div>
         </div>
       </CardHeader>
