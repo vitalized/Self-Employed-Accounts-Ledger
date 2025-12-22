@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Download, FileSpreadsheet, FileText, Calendar } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
 import * as XLSX from "xlsx";
@@ -9,9 +10,12 @@ import * as XLSX from "xlsx";
 interface TaxSummaryProps {
   transactions: Transaction[];
   yearLabel: string;
+  dateRange?: string;
+  setDateRange?: (range: string) => void;
+  taxYears?: string[];
 }
 
-export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
+export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, taxYears = [] }: TaxSummaryProps) {
   const data = useMemo(() => {
     let turnover = 0;
     let otherIncome = 0;
@@ -385,21 +389,41 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
 
   return (
     <Card className="print:shadow-none" ref={cardRef}>
-      <CardHeader>
-        <div className="flex justify-between items-start">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start mb-4">
              <div>
                 <CardTitle className="text-2xl">Self-Assessment Summary {yearLabel}</CardTitle>
                 <CardDescription>Based on SA103F categories</CardDescription>
              </div>
+             <div className="text-right text-sm text-muted-foreground">
+                6 April {yearLabel.split('-')[0]} - 5 April 20{yearLabel.split('-')[1]}
+             </div>
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-2 border-t print:hidden" data-testid="tax-summary-toolbar">
              <div className="flex items-center gap-2">
-                <div className="text-right text-sm text-muted-foreground mr-4">
-                   6 April {yearLabel.split('-')[0]} - 5 April 20{yearLabel.split('-')[1]}
-                </div>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                {setDateRange && taxYears.length > 0 ? (
+                  <Select value={dateRange} onValueChange={setDateRange}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-tax-year-summary">
+                      <SelectValue placeholder="Select tax year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {taxYears.map((year) => (
+                        <SelectItem key={year} value={`tax-year-${year}`}>
+                          Tax Year {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Tax Year {yearLabel}</span>
+                )}
+             </div>
+             <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={exportToCSV}
-                  className="print:hidden"
                   data-testid="button-export-csv"
                 >
                   <Download className="h-4 w-4 mr-1" />
@@ -409,7 +433,6 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
                   variant="outline" 
                   size="sm" 
                   onClick={exportToExcel}
-                  className="print:hidden"
                   data-testid="button-export-excel"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-1" />
@@ -419,7 +442,6 @@ export function TaxSummary({ transactions, yearLabel }: TaxSummaryProps) {
                   variant="outline" 
                   size="sm" 
                   onClick={exportToPDF}
-                  className="print:hidden"
                   data-testid="button-export-pdf"
                 >
                   <FileText className="h-4 w-4 mr-1" />

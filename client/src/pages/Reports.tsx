@@ -313,7 +313,13 @@ export default function Reports() {
           </Card>
         </div>
         
-        <TaxSummary transactions={filteredTransactions} yearLabel={getYearLabel(dateRange)} />
+        <TaxSummary 
+          transactions={filteredTransactions} 
+          yearLabel={getYearLabel(dateRange)}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          taxYears={taxYears}
+        />
 
         <Card>
             <CardHeader>
