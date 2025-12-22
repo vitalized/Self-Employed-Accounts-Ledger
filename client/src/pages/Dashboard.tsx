@@ -245,12 +245,12 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <VATTracker />
-
         <StatCards 
           transactions={filteredTransactions} 
           dateLabel={filters.dateRange}
         />
+
+        <VATTracker />
 
         <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-1">
           <TransactionChart 
