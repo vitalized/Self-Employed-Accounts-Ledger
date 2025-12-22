@@ -142,7 +142,6 @@ export class DatabaseStorage implements IStorage {
     const refLower = (reference || '').toLowerCase().trim();
     
     // Query transactions within date range (more efficient than full table scan)
-    // Compare amounts in application code to handle different string formats
     const startDate = new Date(dayBeforeStr + 'T00:00:00Z');
     const endDate = new Date(dayAfterStr + 'T23:59:59Z');
     
@@ -150,37 +149,39 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(between(transactions.date, startDate, endDate));
     
+    // First pass: find all matching transactions (same amount/description/reference)
+    const matchingTxs: Array<{tx: Transaction, dateStr: string, isFromCSV: boolean}> = [];
+    
     for (const tx of candidates) {
-      // Check amount matches (parse to number to handle different string formats like "100" vs "100.00")
       const txAmount = parseFloat(tx.amount);
       if (Math.abs(txAmount - amount) > 0.01) continue;
-      
-      // Check description matches (case-insensitive)
       if (tx.description.toLowerCase().trim() !== descLower) continue;
-      
-      // Check reference matches (case-insensitive, treat null/empty as equivalent)
       const txRef = (tx.reference || '').toLowerCase().trim();
       if (txRef !== refLower) continue;
-      
-      // Check if transaction date falls within allowed dates (using UTC date string)
       const txDateStr = new Date(tx.date).toISOString().split('T')[0];
       if (!allowedDates.has(txDateStr)) continue;
       
-      // Only consider as duplicate if:
-      // 1. Exact same date (definitely a duplicate), OR
-      // 2. Different date but the existing transaction is from Starling API (not CSV import)
-      //    This handles Starling settlement date vs transaction date mismatches
-      //    where the API shows one date and CSV shows another (typically +1 day)
-      const isSameDate = txDateStr === inputDateStr;
-      const existingIsFromCSV = tx.tags && tx.tags.includes('import:csv');
-      
-      if (isSameDate || !existingIsFromCSV) {
-        // Same date = duplicate, OR existing is from API (not CSV) = likely API/CSV date mismatch
-        return tx;
-      }
-      // If both are from CSV and different dates, it's a legitimate consecutive-day transaction
+      const isFromCSV = tx.tags && tx.tags.includes('import:csv');
+      matchingTxs.push({ tx, dateStr: txDateStr, isFromCSV: !!isFromCSV });
     }
     
+    // Check for exact same date match first (definitely a duplicate)
+    const sameDateMatch = matchingTxs.find(m => m.dateStr === inputDateStr);
+    if (sameDateMatch) {
+      return sameDateMatch.tx;
+    }
+    
+    // For ±1 day matches, only treat as duplicate if there's exactly ONE API transaction
+    // This prevents blocking legitimate consecutive-day transactions
+    const apiMatches = matchingTxs.filter(m => !m.isFromCSV);
+    
+    if (apiMatches.length === 1) {
+      // Single API transaction on adjacent day - likely same transaction with date mismatch
+      return apiMatches[0].tx;
+    }
+    
+    // Multiple API transactions on different days = recurring pattern, allow CSV import
+    // Zero API matches = no duplicate
     return null;
   }
 
