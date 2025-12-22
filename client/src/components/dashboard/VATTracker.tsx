@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
@@ -93,12 +93,9 @@ export function VATTracker() {
 
   if (isLoading || !data) {
     return (
-      <Card className="mb-6">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">VAT Threshold Tracker</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse h-24 bg-muted rounded" />
+      <Card className="mb-4">
+        <CardContent className="py-4">
+          <div className="animate-pulse h-12 bg-muted rounded" />
         </CardContent>
       </Card>
     );
@@ -108,80 +105,64 @@ export function VATTracker() {
   const StatusIcon = config.icon;
 
   return (
-    <Card className="mb-6" data-testid="vat-tracker-card">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            VAT Threshold Tracker
-            <span className={cn("text-xs px-2 py-1 rounded-full", config.bgColor, config.color)}>
-              Rolling 12 months
-            </span>
-          </CardTitle>
-          <div className="flex items-center gap-1">
+    <Card className="mb-4" data-testid="vat-tracker-card">
+      <CardContent className="py-4">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className={cn("p-2 rounded-lg", config.bgColor)}>
+              <StatusIcon className={cn("h-5 w-5", config.color)} />
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">VAT Threshold</div>
+              <div className="text-xl font-bold" data-testid="vat-total-income">
+                £{data.totalIncome.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                <span className="text-sm font-normal text-muted-foreground"> / £{data.threshold.toLocaleString('en-GB')}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 space-y-1">
+            <Progress 
+              value={Math.min(100, data.percentOfThreshold)} 
+              className={cn("h-2", data.status === 'exceeded' && "animate-pulse")}
+              data-testid="vat-progress-bar"
+            />
+            <div className="flex justify-between items-center">
+              <span className={cn("text-xs font-medium", config.color)} data-testid="vat-message">
+                {data.status === 'exceeded' 
+                  ? 'VAT registration required' 
+                  : `£${data.remainingBeforeVAT.toLocaleString('en-GB', { minimumFractionDigits: 0 })} remaining`
+                }
+              </span>
+              <span className={cn("text-xs font-semibold", config.color)} data-testid="vat-status">
+                {data.percentOfThreshold}%
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0 border-l pl-4">
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
+              className="h-8 w-8 p-0"
               onClick={() => navigateMonth('prev')}
               data-testid="vat-nav-prev"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm text-muted-foreground min-w-[120px] text-center">
-              Ending {formatMonth(endMonth)}
+            <span className="text-xs text-muted-foreground min-w-[70px] text-center">
+              {formatMonth(endMonth)}
             </span>
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
+              className="h-8 w-8 p-0"
               onClick={() => navigateMonth('next')}
               disabled={isAtCurrentMonth}
               data-testid="vat-nav-next"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-3xl font-bold" data-testid="vat-total-income">
-                £{data.totalIncome.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                of £{data.threshold.toLocaleString('en-GB')} VAT threshold
-              </div>
-            </div>
-            <div className={cn("flex items-center gap-2 px-3 py-2 rounded-lg", config.bgColor)}>
-              <StatusIcon className={cn("h-5 w-5", config.color)} />
-              <span className={cn("text-sm font-medium", config.color)} data-testid="vat-status">
-                {data.status === 'exceeded' ? 'Exceeded' : `${data.percentOfThreshold}%`}
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Progress 
-              value={Math.min(100, data.percentOfThreshold)} 
-              className={cn("h-3", data.status === 'exceeded' && "animate-pulse")}
-              data-testid="vat-progress-bar"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{formatMonth(data.windowStart)}</span>
-              <span>{formatMonth(data.windowEnd)}</span>
-            </div>
-          </div>
-
-          <div className={cn("flex items-center gap-2 p-3 rounded-lg", config.bgColor)}>
-            <StatusIcon className={cn("h-4 w-4 flex-shrink-0", config.color)} />
-            <span className={cn("text-sm", config.color)} data-testid="vat-message">
-              {config.message}
-              {data.status !== 'exceeded' && (
-                <span className="font-medium">
-                  {' '}— £{data.remainingBeforeVAT.toLocaleString('en-GB', { minimumFractionDigits: 2 })} remaining
-                </span>
-              )}
-            </span>
           </div>
         </div>
       </CardContent>
