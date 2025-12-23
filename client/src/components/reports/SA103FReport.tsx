@@ -346,25 +346,19 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
 
   return (
     <div className="p-6 space-y-6" ref={cardRef}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Self-Assessment Summary</h2>
-          <p className="text-muted-foreground">Tax Year {yearLabel} (6 April {yearLabel.split('-')[0]} - 5 April 20{yearLabel.split('-')[1]})</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => exportToCSV()} data-testid="button-export-csv">
-            <Download className="h-4 w-4 mr-1" />
-            CSV
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => exportToExcel()} data-testid="button-export-excel">
-            <FileSpreadsheet className="h-4 w-4 mr-1" />
-            Excel
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => exportToPDF()} data-testid="button-export-pdf">
-            <FileText className="h-4 w-4 mr-1" />
-            PDF
-          </Button>
-        </div>
+      <div className="flex items-center justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => exportToCSV()} data-testid="button-export-csv">
+          <Download className="h-4 w-4 mr-1" />
+          CSV
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => exportToExcel()} data-testid="button-export-excel">
+          <FileSpreadsheet className="h-4 w-4 mr-1" />
+          Excel
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => exportToPDF()} data-testid="button-export-pdf">
+          <FileText className="h-4 w-4 mr-1" />
+          PDF
+        </Button>
       </div>
 
       <Tabs defaultValue="summary" className="w-full">

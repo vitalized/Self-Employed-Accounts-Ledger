@@ -62,11 +62,6 @@ export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportPr
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Profit & Loss Statement</h2>
-        <p className="text-muted-foreground">Tax Year {yearLabel}</p>
-      </div>
-
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-4">
           <Card>

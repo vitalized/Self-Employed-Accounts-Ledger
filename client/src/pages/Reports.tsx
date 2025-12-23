@@ -14,12 +14,12 @@ import { TaxCalculatorReport } from "@/components/reports/TaxCalculatorReport";
 import { VATSummaryReport } from "@/components/reports/VATSummaryReport";
 import { Calendar } from "lucide-react";
 
-const REPORT_TITLES: Record<string, { title: string; description: string }> = {
-  'sa103f': { title: 'SA103F Summary', description: 'Self-assessment tax return summary based on HMRC categories' },
-  'profit-loss': { title: 'Profit & Loss', description: 'Income and expense statement for your business' },
-  'expenses': { title: 'Expense Breakdown', description: 'Detailed analysis of your business expenses by category' },
-  'tax-calculator': { title: 'Tax Calculator', description: 'UK income tax and National Insurance calculator' },
-  'vat': { title: 'VAT Summary', description: 'VAT threshold tracking and registration status' },
+const REPORT_TITLES: Record<string, { title: string; getDescription: (yearLabel: string) => string }> = {
+  'sa103f': { title: 'Self-Assessment Summary', getDescription: (y) => `Tax Year ${y} (6 April ${y.split('-')[0]} - 5 April 20${y.split('-')[1]})` },
+  'profit-loss': { title: 'Profit & Loss Statement', getDescription: (y) => `Tax Year ${y}` },
+  'expenses': { title: 'Expense Breakdown', getDescription: (y) => `Tax Year ${y}` },
+  'tax-calculator': { title: 'Tax Calculator', getDescription: (y) => `UK Income Tax & National Insurance (Tax Year ${y})` },
+  'vat': { title: 'VAT Summary', getDescription: (y) => `VAT threshold tracking (Tax Year ${y})` },
 };
 
 export default function Reports() {
@@ -105,9 +105,9 @@ export default function Reports() {
     });
   }, [transactions, currentRange]);
 
+  const yearLabel = getYearLabel(dateRange);
+
   const renderReport = () => {
-    const yearLabel = getYearLabel(dateRange);
-    
     switch (reportId) {
       case 'sa103f':
         return <SA103FReport transactions={filteredTransactions} yearLabel={yearLabel} />;
@@ -143,7 +143,7 @@ export default function Reports() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">{currentReportInfo.title}</h2>
             <p className="text-sm text-muted-foreground">
-              {currentReportInfo.description}
+              {currentReportInfo.getDescription(yearLabel)}
             </p>
           </div>
           <div className="flex items-center gap-3">

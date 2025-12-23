@@ -84,11 +84,6 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">VAT Summary</h2>
-        <p className="text-muted-foreground">VAT threshold tracking (Tax Year {yearLabel})</p>
-      </div>
-
       <Card className={`${statusConfig[status].bg} ${statusConfig[status].border} border-2`}>
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">

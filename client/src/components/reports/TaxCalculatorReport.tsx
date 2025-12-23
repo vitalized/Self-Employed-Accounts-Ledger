@@ -112,11 +112,6 @@ export function TaxCalculatorReport({ transactions, yearLabel }: TaxCalculatorRe
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Tax Calculator</h2>
-        <p className="text-muted-foreground">UK Income Tax & National Insurance (Tax Year {yearLabel})</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Your Profit</CardTitle>
