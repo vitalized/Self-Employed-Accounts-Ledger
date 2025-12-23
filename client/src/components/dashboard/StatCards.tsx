@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { flushSync } from "react-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
 import { ArrowUpRight, ArrowDownRight, Wallet, ChevronUp, ChevronDown } from "lucide-react";
@@ -86,36 +85,52 @@ interface AnimatedPanelProps {
   isActive: boolean;
   children: React.ReactNode;
   className?: string;
+  contentKey?: string | null;
 }
 
-function AnimatedPanel({ isActive, children, className }: AnimatedPanelProps) {
+function AnimatedPanel({ isActive, children, className, contentKey }: AnimatedPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>(0);
   const [shouldRender, setShouldRender] = useState(false);
+  const prevContentKeyRef = useRef<string | null | undefined>(contentKey);
 
   useEffect(() => {
     const container = containerRef.current;
     const content = contentRef.current;
     if (!container || !content) return;
 
+    const contentChanged = isActive && prevContentKeyRef.current !== contentKey && shouldRender;
+    prevContentKeyRef.current = contentKey;
+
     if (isActive && !shouldRender) {
       setShouldRender(true);
-      flushSync(() => setHeight(0));
-      void container.offsetHeight;
+      setHeight(0);
       requestAnimationFrame(() => {
-        const targetHeight = content.scrollHeight;
-        setHeight(targetHeight);
+        requestAnimationFrame(() => {
+          const targetHeight = content.scrollHeight;
+          setHeight(targetHeight);
+        });
+      });
+    } else if (contentChanged) {
+      const currentHeight = container.getBoundingClientRect().height;
+      setHeight(currentHeight);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const targetHeight = content.scrollHeight;
+          setHeight(targetHeight);
+        });
       });
     } else if (!isActive && shouldRender) {
       const currentHeight = container.getBoundingClientRect().height;
-      flushSync(() => setHeight(currentHeight));
-      void container.offsetHeight;
+      setHeight(currentHeight);
       requestAnimationFrame(() => {
-        setHeight(0);
+        requestAnimationFrame(() => {
+          setHeight(0);
+        });
       });
     }
-  }, [isActive, shouldRender]);
+  }, [isActive, shouldRender, contentKey]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -220,7 +235,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   };
 
   const ProfitContent = () => (
-    <Card className="border-2 border-t-0 border-blue-500 dark:border-blue-500 rounded-t-none rounded-b-xl bg-blue-50 dark:bg-blue-950">
+    <Card className="border-2 border-blue-500 dark:border-blue-500 rounded-xl bg-blue-50 dark:bg-blue-950">
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -278,7 +293,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const IncomeContent = () => (
-    <Card className="border-2 border-t-0 border-emerald-500 dark:border-emerald-500 rounded-t-none rounded-b-xl bg-emerald-50 dark:bg-emerald-950">
+    <Card className="border-2 border-emerald-500 dark:border-emerald-500 rounded-xl bg-emerald-50 dark:bg-emerald-950">
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -333,7 +348,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const ExpensesContent = () => (
-    <Card className="border-2 border-t-0 border-red-500 dark:border-red-500 rounded-t-none rounded-b-xl bg-red-50 dark:bg-red-950">
+    <Card className="border-2 border-red-500 dark:border-red-500 rounded-xl bg-red-50 dark:bg-red-950">
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -386,7 +401,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const TaxContent = () => (
-    <Card className="border-2 border-t-0 border-amber-500 dark:border-amber-500 rounded-t-none rounded-b-xl bg-amber-50 dark:bg-amber-950">
+    <Card className="border-2 border-amber-500 dark:border-amber-500 rounded-xl bg-amber-50 dark:bg-amber-950">
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -550,7 +565,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </Card>
         </div>
         
-        <AnimatedPanel isActive={activeTab !== null}>
+        <AnimatedPanel isActive={activeTab !== null} contentKey={activeTab}>
           {renderContent(activeTab)}
         </AnimatedPanel>
       </div>
