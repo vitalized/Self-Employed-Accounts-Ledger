@@ -103,3 +103,21 @@ export const insertTransactionNoteSchema = createInsertSchema(transactionNotes).
 
 export type InsertTransactionNote = z.infer<typeof insertTransactionNoteSchema>;
 export type TransactionNote = typeof transactionNotes.$inferSelect;
+
+// Categories for income and expenses (user-editable)
+export const categories = pgTable("categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  label: text("label").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // 'Income' or 'Expense'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCategorySchema = createInsertSchema(categories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+export type Category = typeof categories.$inferSelect;

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateTransactionSchema, insertCategorizationRuleSchema } from "@shared/schema";
+import { insertTransactionSchema, updateTransactionSchema, insertCategorizationRuleSchema, insertCategorySchema } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -484,6 +484,98 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error applying rules:", error);
       res.status(500).json({ error: "Failed to apply rules" });
+    }
+  });
+
+  // ===== Categories API endpoints =====
+
+  // Get all categories
+  app.get("/api/categories", async (req, res) => {
+    try {
+      const cats = await storage.getCategories();
+      res.json(cats);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  // Create category
+  app.post("/api/categories", async (req, res) => {
+    try {
+      const validatedData = insertCategorySchema.parse(req.body);
+      const category = await storage.createCategory(validatedData);
+      res.status(201).json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid category data", details: error.errors });
+      }
+      console.error("Error creating category:", error);
+      res.status(500).json({ error: "Failed to create category" });
+    }
+  });
+
+  // Update category
+  app.patch("/api/categories/:id", async (req, res) => {
+    try {
+      const validatedData = insertCategorySchema.partial().parse(req.body);
+      const category = await storage.updateCategory(req.params.id, validatedData);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid category data", details: error.errors });
+      }
+      console.error("Error updating category:", error);
+      res.status(500).json({ error: "Failed to update category" });
+    }
+  });
+
+  // Delete category with reassignment
+  app.delete("/api/categories/:id", async (req, res) => {
+    try {
+      const { reassignTo } = req.query;
+      
+      // Get the category being deleted
+      const category = await storage.getCategory(req.params.id);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      
+      // If reassignTo is specified, reassign all transactions
+      let reassigned = 0;
+      if (reassignTo && typeof reassignTo === 'string') {
+        reassigned = await storage.reassignTransactionCategory(category.label, reassignTo);
+      }
+      
+      const success = await storage.deleteCategory(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      
+      res.json({ success: true, reassigned, message: reassigned > 0 ? `Deleted category and reassigned ${reassigned} transactions` : 'Category deleted' });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      res.status(500).json({ error: "Failed to delete category" });
+    }
+  });
+
+  // Get transaction count for a category
+  app.get("/api/categories/:id/count", async (req, res) => {
+    try {
+      const category = await storage.getCategory(req.params.id);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      
+      const transactions = await storage.getTransactions();
+      const count = transactions.filter(t => t.category === category.label).length;
+      res.json({ count });
+    } catch (error) {
+      console.error("Error counting transactions:", error);
+      res.status(500).json({ error: "Failed to count transactions" });
     }
   });
 

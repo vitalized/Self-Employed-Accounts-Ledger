@@ -1,4 +1,4 @@
-import { users, transactions, settings, categorizationRules, transactionNotes, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote } from "@shared/schema";
+import { users, transactions, settings, categorizationRules, transactionNotes, categories, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, ilike, between, sql } from "drizzle-orm";
 
@@ -40,6 +40,16 @@ export interface IStorage {
   getNoteByDescription(description: string): Promise<TransactionNote | undefined>;
   setNote(description: string, note: string): Promise<TransactionNote>;
   deleteNote(description: string): Promise<boolean>;
+  
+  // Category methods
+  getCategories(): Promise<Category[]>;
+  getCategory(id: string): Promise<Category | undefined>;
+  getCategoryByCode(code: string): Promise<Category | undefined>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category | undefined>;
+  deleteCategory(id: string): Promise<boolean>;
+  reassignTransactionCategory(oldCategory: string, newCategory: string): Promise<number>;
+  seedDefaultCategories(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -350,6 +360,103 @@ export class DatabaseStorage implements IStorage {
       .where(eq(transactionNotes.description, description))
       .returning();
     return result.length > 0;
+  }
+
+  // Category methods
+  async getCategories(): Promise<Category[]> {
+    return await db.select().from(categories).orderBy(categories.type, categories.label);
+  }
+
+  async getCategory(id: string): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+    return category || undefined;
+  }
+
+  async getCategoryByCode(code: string): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.code, code));
+    return category || undefined;
+  }
+
+  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+    const [category] = await db
+      .insert(categories)
+      .values(insertCategory)
+      .returning();
+    return category;
+  }
+
+  async updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category | undefined> {
+    const [category] = await db
+      .update(categories)
+      .set(updates)
+      .where(eq(categories.id, id))
+      .returning();
+    return category || undefined;
+  }
+
+  async deleteCategory(id: string): Promise<boolean> {
+    const result = await db
+      .delete(categories)
+      .where(eq(categories.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async reassignTransactionCategory(oldCategory: string, newCategory: string): Promise<number> {
+    const result = await db
+      .update(transactions)
+      .set({ category: newCategory })
+      .where(eq(transactions.category, oldCategory))
+      .returning();
+    return result.length;
+  }
+
+  async seedDefaultCategories(): Promise<void> {
+    const existingCategories = await this.getCategories();
+    if (existingCategories.length > 0) {
+      return;
+    }
+
+    const expenseCategories = [
+      { code: "C10", label: "Accountancy", description: "Accountancy and bookkeeping fees", type: "Expense" },
+      { code: "24", label: "Advertising", description: "Advertising and business entertainment costs", type: "Expense" },
+      { code: "27", label: "Bad Debts", description: "Irrecoverable debts written off", type: "Expense" },
+      { code: "26", label: "Bank Charges", description: "Bank, credit card and other financial charges", type: "Expense" },
+      { code: "C9", label: "Books and Professional Magazines", description: "Professional books, journals and publications", type: "Expense" },
+      { code: "C3", label: "Broadband", description: "Internet and broadband costs", type: "Expense" },
+      { code: "17", label: "Cost of Goods", description: "Cost of goods bought for resale or goods used", type: "Expense" },
+      { code: "C8", label: "Courses and Training", description: "Training courses including CPE/CPD", type: "Expense" },
+      { code: "29", label: "Depreciation", description: "Depreciation and loss/profit on sale of assets", type: "Expense" },
+      { code: "C11", label: "Hotels and Business Accommodation", description: "Hotel stays and accommodation for business travel", type: "Expense" },
+      { code: "C6", label: "Insurance & Licences", description: "Business insurance and professional licences", type: "Expense" },
+      { code: "25", label: "Loan Interest", description: "Interest on bank and other loans", type: "Expense" },
+      { code: "C2", label: "Mobile Phone", description: "Mobile phone bills and top-ups", type: "Expense" },
+      { code: "23", label: "Office Costs", description: "Phone, fax, stationery and other office costs", type: "Expense" },
+      { code: "30", label: "Other Expenses", description: "Other business expenses", type: "Expense" },
+      { code: "C1", label: "Postage and Stationery", description: "Postage, stamps, envelopes, paper and stationery", type: "Expense" },
+      { code: "21", label: "Premises Costs", description: "Rent, rates, power and insurance costs", type: "Expense" },
+      { code: "28", label: "Professional Fees", description: "Accountancy, legal and other professional fees", type: "Expense" },
+      { code: "22", label: "Repairs & Maintenance", description: "Repairs and maintenance of property and equipment", type: "Expense" },
+      { code: "C5", label: "Software and Computer Incidentals", description: "Software subscriptions, licenses and computer consumables", type: "Expense" },
+      { code: "19", label: "Staff Costs", description: "Wages, salaries and other staff costs", type: "Expense" },
+      { code: "18", label: "Subcontractor Costs", description: "Construction industry payments to subcontractors", type: "Expense" },
+      { code: "C7", label: "Subscriptions", description: "Professional and trade subscriptions", type: "Expense" },
+      { code: "20", label: "Travel & Vehicle", description: "Car, van and travel expenses", type: "Expense" },
+      { code: "C4", label: "Website and Hosting", description: "Website hosting, domain names and web services", type: "Expense" },
+    ];
+
+    const incomeCategories = [
+      { code: "I3", label: "Commission", description: "Commission income", type: "Income" },
+      { code: "I2", label: "Consulting", description: "Consulting or freelance income", type: "Income" },
+      { code: "I4", label: "Grants", description: "Business grants received", type: "Income" },
+      { code: "I6", label: "Other Income", description: "Other business income", type: "Income" },
+      { code: "I5", label: "Refunds", description: "Business refunds received", type: "Income" },
+      { code: "I1", label: "Sales", description: "Sales of goods or services", type: "Income" },
+    ];
+
+    for (const cat of [...expenseCategories, ...incomeCategories]) {
+      await this.createCategory(cat);
+    }
   }
 }
 
