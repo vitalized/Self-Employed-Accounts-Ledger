@@ -114,7 +114,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     return cn(
       "cursor-pointer transition-all",
       isActive
-        ? `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} rounded-b-none ${baseColor} -mb-4 relative z-10`
+        ? `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} rounded-b-none ${baseColor} -mb-[18px] relative z-10`
         : "border border-slate-200 dark:border-slate-800"
     );
   };
