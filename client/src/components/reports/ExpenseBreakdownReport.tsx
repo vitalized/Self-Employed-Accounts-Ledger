@@ -51,7 +51,6 @@ export function ExpenseBreakdownReport({ transactions, yearLabel }: ExpenseBreak
         <TabsList data-testid="tabs-expense-breakdown">
           <TabsTrigger value="summary" data-testid="tab-summary">Summary</TabsTrigger>
           <TabsTrigger value="charts" data-testid="tab-charts">Charts</TabsTrigger>
-          <TabsTrigger value="details" data-testid="tab-details">Details</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="mt-6 space-y-6">
@@ -125,31 +124,63 @@ export function ExpenseBreakdownReport({ transactions, yearLabel }: ExpenseBreak
               <CardDescription>Where your money is going</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[400px] flex items-center justify-center">
-                {expenseData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={expenseData}
-                        cx="40%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={130}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percentage }) => `${percentage}%`}
-                      >
-                        {expenseData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `£${value.toLocaleString()}`} />
-                      <Legend layout="vertical" verticalAlign="middle" align="right" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-muted-foreground text-sm">No expense data for this period</div>
-                )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="h-[350px] flex items-center justify-center">
+                  {expenseData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={expenseData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={70}
+                          outerRadius={120}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ percentage }) => `${percentage}%`}
+                        >
+                          {expenseData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => `£${value.toLocaleString()}`} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="text-muted-foreground text-sm">No expense data for this period</div>
+                  )}
+                </div>
+                
+                <div className="flex flex-col h-[350px]">
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                    {expenseData.map((item, index) => (
+                      <div key={item.name} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                          />
+                          <span className="font-medium text-sm">{item.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground text-xs">{item.percentage}%</span>
+                          <span className="font-semibold text-sm">£{item.value.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {expenseData.length > 0 && (
+                    <div className="flex items-center justify-between py-3 border-t-2 font-bold mt-2 bg-card flex-shrink-0">
+                      <span>Total Expenses</span>
+                      <span className="text-red-600">£{totalExpenses.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {expenseData.length === 0 && (
+                    <div className="text-muted-foreground text-center py-8">
+                      No expenses recorded for this period
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -170,45 +201,6 @@ export function ExpenseBreakdownReport({ transactions, yearLabel }: ExpenseBreak
                     <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="details" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Categories</CardTitle>
-              <CardDescription>Complete breakdown of expenses</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {expenseData.map((item, index) => (
-                  <div key={item.name} className="flex items-center justify-between py-2 border-b last:border-b-0">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      <span className="font-medium">{item.name}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-muted-foreground text-sm">{item.percentage}%</span>
-                      <span className="font-semibold">£{item.value.toLocaleString()}</span>
-                    </div>
-                  </div>
-                ))}
-                {expenseData.length > 0 && (
-                  <div className="flex items-center justify-between py-3 border-t-2 font-bold text-lg mt-2">
-                    <span>Total Expenses</span>
-                    <span className="text-red-600">£{totalExpenses.toLocaleString()}</span>
-                  </div>
-                )}
-                {expenseData.length === 0 && (
-                  <div className="text-muted-foreground text-center py-8">
-                    No expenses recorded for this period
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
