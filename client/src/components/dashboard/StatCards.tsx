@@ -187,7 +187,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       )}>
         <Card className="border-0 border-l-2 border-r-2 border-b-2 border-amber-500 dark:border-amber-500 rounded-t-none bg-slate-50 dark:bg-slate-900">
           <CardContent className="pt-4">
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-12 md:grid-cols-3">
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tax Components</h4>
                 <div className="space-y-2">
