@@ -98,54 +98,54 @@ export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportPr
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Income vs Expenses</CardTitle>
-            <CardDescription>Side-by-side comparison</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[350px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} />
-                  <Tooltip 
-                    formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Legend />
-                  <Bar dataKey="income" name="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Monthly Income vs Expenses</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} width={60} />
+                    <Tooltip 
+                      formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Bar dataKey="income" name="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Cumulative Profit Trend</CardTitle>
-            <CardDescription>Running total over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={cumulativeData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} />
-                  <Tooltip 
-                    formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="cumulative" name="Cumulative Profit" stroke="#0ea5e9" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Cumulative Profit Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={cumulativeData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} width={60} />
+                    <Tooltip 
+                      formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Line type="monotone" dataKey="cumulative" name="Cumulative Profit" stroke="#0ea5e9" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
