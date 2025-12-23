@@ -178,12 +178,18 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       if (animationPhase === 'collapsing') {
         if (pendingTab) {
           // Switching tabs - now expand to the new tab
-          setActiveTab(pendingTab);
-          setDisplayedTab(pendingTab);
-          setAnimationPhase('expanding');
-          setPendingTab(null);
+          // Use flushSync to ensure DOM is updated before measuring
+          const tabToExpand = pendingTab;
+          flushSync(() => {
+            setActiveTab(tabToExpand);
+            setDisplayedTab(tabToExpand);
+            setAnimationPhase('expanding');
+            setPendingTab(null);
+            setContainerHeight(0);
+          });
+          void container.offsetHeight; // Force reflow
           requestAnimationFrame(() => {
-            const newHeight = measureHeight(pendingTab);
+            const newHeight = measureHeight(tabToExpand);
             setContainerHeight(newHeight);
           });
         } else {
