@@ -137,7 +137,9 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         setPendingTab(null);
       });
       void container?.offsetHeight; // Force reflow
-      setContainerHeight(0);
+      requestAnimationFrame(() => {
+        setContainerHeight(0);
+      });
     } else if (activeTab === null) {
       // Opening a new tab from closed state - animate height from 0 to target
       flushSync(() => {
@@ -160,7 +162,9 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         setAnimationPhase('collapsing');
       });
       void container?.offsetHeight; // Force reflow
-      setContainerHeight(0);
+      requestAnimationFrame(() => {
+        setContainerHeight(0);
+      });
     }
   }, [activeTab, animationPhase, displayedTab, measureHeight]);
 
