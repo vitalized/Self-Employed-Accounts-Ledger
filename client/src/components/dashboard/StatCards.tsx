@@ -198,13 +198,24 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6);
 
-  const getCardClasses = (tab: TabType, baseColor: string, borderColor: string, roundedClass?: string) => {
+  const getCardClasses = (tab: TabType, baseColor: string, borderColor: string, forDesktop: boolean = false) => {
     const isActive = activeTab === tab;
+    if (isActive) {
+      if (forDesktop) {
+        return cn(
+          "cursor-pointer transition-all",
+          `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} ${baseColor} rounded-b-none -mb-[18px] relative z-10`
+        );
+      } else {
+        return cn(
+          "cursor-pointer transition-all",
+          `border-2 ${borderColor} ${baseColor} rounded-b-none`
+        );
+      }
+    }
     return cn(
       "cursor-pointer transition-all",
-      isActive
-        ? `border-2 ${borderColor} ${baseColor} rounded-b-none ${roundedClass || ''}`
-        : "border border-slate-200 dark:border-slate-800"
+      "border border-slate-200 dark:border-slate-800"
     );
   };
 
@@ -455,7 +466,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       <div className="space-y-0">
         <div className="grid gap-4 grid-cols-4 pb-4">
           <Card 
-            className={getCardClasses('profit', 'bg-blue-50 dark:bg-blue-950', 'border-blue-500 dark:border-blue-500')}
+            className={getCardClasses('profit', 'bg-blue-50 dark:bg-blue-950', 'border-blue-500 dark:border-blue-500', true)}
             onClick={() => toggleTab('profit')}
             data-testid="card-profit"
           >
@@ -476,7 +487,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </Card>
           
           <Card 
-            className={getCardClasses('income', 'bg-emerald-50 dark:bg-emerald-950', 'border-emerald-500 dark:border-emerald-500')}
+            className={getCardClasses('income', 'bg-emerald-50 dark:bg-emerald-950', 'border-emerald-500 dark:border-emerald-500', true)}
             onClick={() => toggleTab('income')}
             data-testid="card-income"
           >
@@ -497,7 +508,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </Card>
           
           <Card 
-            className={getCardClasses('expenses', 'bg-red-50 dark:bg-red-950', 'border-red-500 dark:border-red-500')}
+            className={getCardClasses('expenses', 'bg-red-50 dark:bg-red-950', 'border-red-500 dark:border-red-500', true)}
             onClick={() => toggleTab('expenses')}
             data-testid="card-expenses"
           >
@@ -518,7 +529,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </Card>
 
           <Card 
-            className={getCardClasses('tax', 'bg-amber-50 dark:bg-amber-950', 'border-amber-500 dark:border-amber-500')}
+            className={getCardClasses('tax', 'bg-amber-50 dark:bg-amber-950', 'border-amber-500 dark:border-amber-500', true)}
             onClick={() => toggleTab('tax')}
             data-testid="card-tax-owed"
           >
@@ -539,7 +550,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </Card>
         </div>
         
-        <AnimatedPanel isActive={activeTab !== null} className="-mt-4">
+        <AnimatedPanel isActive={activeTab !== null}>
           {renderContent(activeTab)}
         </AnimatedPanel>
       </div>
