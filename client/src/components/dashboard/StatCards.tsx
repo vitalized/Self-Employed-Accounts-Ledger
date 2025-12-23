@@ -87,7 +87,6 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const [displayedTab, setDisplayedTab] = useState<TabType>(null);
   const [animationPhase, setAnimationPhase] = useState<'idle' | 'collapsing' | 'expanding'>('idle');
   const [containerHeight, setContainerHeight] = useState<number | 'auto'>(0);
-  const [reservedHeight, setReservedHeight] = useState<number | 'auto'>('auto');
   const [pendingTab, setPendingTab] = useState<TabType>(null);
   
   const profitRef = useRef<HTMLDivElement>(null);
@@ -95,7 +94,6 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const expensesRef = useRef<HTMLDivElement>(null);
   const taxRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
   
   const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income');
   const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense');
@@ -129,45 +127,39 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const toggleTab = useCallback((tab: TabType) => {
     if (animationPhase !== 'idle') return;
     const container = containerRef.current;
-    const wrapper = wrapperRef.current;
 
     if (activeTab === tab) {
-      // Closing the current tab
+      // Closing the current tab - animate height from current to 0
       const currentHeight = container?.getBoundingClientRect().height || measureHeight(displayedTab);
       flushSync(() => {
-        setReservedHeight(currentHeight);
         setContainerHeight(currentHeight);
         setAnimationPhase('collapsing');
         setPendingTab(null);
       });
-      void wrapper?.offsetHeight;
+      void container?.offsetHeight; // Force reflow
       setContainerHeight(0);
     } else if (activeTab === null) {
-      // Opening a new tab from closed state
+      // Opening a new tab from closed state - animate height from 0 to target
       flushSync(() => {
         setActiveTab(tab);
         setDisplayedTab(tab);
         setAnimationPhase('expanding');
         setContainerHeight(0);
-        setReservedHeight(0);
       });
+      void container?.offsetHeight; // Force reflow
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const newHeight = measureHeight(tab);
-          setReservedHeight(newHeight);
-          setContainerHeight(newHeight);
-        });
+        const newHeight = measureHeight(tab);
+        setContainerHeight(newHeight);
       });
     } else {
-      // Switching from one tab to another
+      // Switching from one tab to another - collapse first, then expand
       const currentHeight = container?.getBoundingClientRect().height || measureHeight(displayedTab);
       flushSync(() => {
-        setReservedHeight(currentHeight);
         setContainerHeight(currentHeight);
         setPendingTab(tab);
         setAnimationPhase('collapsing');
       });
-      void wrapper?.offsetHeight;
+      void container?.offsetHeight; // Force reflow
       setContainerHeight(0);
     }
   }, [activeTab, animationPhase, displayedTab, measureHeight]);
@@ -181,31 +173,24 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
 
       if (animationPhase === 'collapsing') {
         if (pendingTab) {
+          // Switching tabs - now expand to the new tab
           setActiveTab(pendingTab);
           setDisplayedTab(pendingTab);
           setAnimationPhase('expanding');
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              const newHeight = measureHeight(pendingTab);
-              // Use max of current reserved height and new height to prevent both:
-              // - shrinking (longer→shorter): keeps larger height
-              // - overflow (shorter→longer): grows to accommodate
-              setReservedHeight(prev => 
-                typeof prev === 'number' ? Math.max(prev, newHeight) : newHeight
-              );
-              setContainerHeight(newHeight);
-            });
-          });
           setPendingTab(null);
+          requestAnimationFrame(() => {
+            const newHeight = measureHeight(pendingTab);
+            setContainerHeight(newHeight);
+          });
         } else {
+          // Closing completely
           setActiveTab(null);
           setDisplayedTab(null);
-          setReservedHeight('auto');
           setAnimationPhase('idle');
         }
       } else if (animationPhase === 'expanding') {
+        // Expansion complete - release to auto for natural sizing
         setContainerHeight('auto');
-        setReservedHeight('auto');
         setAnimationPhase('idle');
       }
     };
@@ -327,14 +312,10 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       </div>
       
       <div 
-        ref={wrapperRef}
-        style={{ height: reservedHeight === 'auto' ? 'auto' : reservedHeight }}
+        ref={containerRef}
+        className="overflow-hidden transition-[height] duration-300 ease-in-out"
+        style={{ height: containerHeight }}
       >
-        <div 
-          ref={containerRef}
-          className="overflow-hidden transition-all duration-300 ease-in-out"
-          style={{ height: containerHeight }}
-        >
           <div ref={profitRef} className={cn(!isContentVisible('profit') && 'hidden')}>
           <Card className="border-2 border-blue-500 dark:border-blue-500 rounded-tl-none rounded-tr-xl rounded-b-xl bg-blue-50 dark:bg-blue-950">
             <CardContent className="pt-4">
@@ -565,7 +546,6 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
               </div>
             </CardContent>
           </Card>
-        </div>
         </div>
       </div>
     </div>
