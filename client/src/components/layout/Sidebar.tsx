@@ -16,7 +16,10 @@ import {
   TrendingUp,
   Wallet,
   Calculator,
-  ReceiptText
+  ReceiptText,
+  ListFilter,
+  Building,
+  Sliders
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -35,11 +38,18 @@ const reportSubItems = [
   { href: "/reports/vat", label: "VAT Summary", icon: ReceiptText },
 ];
 
+const settingsSubItems = [
+  { href: "/settings/rules", label: "Rules", icon: ListFilter },
+  { href: "/settings/integrations", label: "Integrations", icon: Building },
+  { href: "/settings/preferences", label: "Preferences", icon: Sliders },
+];
+
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [reportsExpanded, setReportsExpanded] = useState(() => location.startsWith('/reports'));
+  const [settingsExpanded, setSettingsExpanded] = useState(() => location.startsWith('/settings'));
 
   useEffect(() => {
     setMounted(true);
@@ -48,6 +58,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   useEffect(() => {
     if (location.startsWith('/reports')) {
       setReportsExpanded(true);
+    }
+    if (location.startsWith('/settings')) {
+      setSettingsExpanded(true);
     }
   }, [location]);
 
@@ -60,11 +73,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/transactions", label: "Transactions", icon: Receipt },
   ];
 
-  const bottomLinks = [
-    { href: "/settings", label: "Settings", icon: Settings },
-  ];
-
   const isReportsActive = location.startsWith('/reports');
+  const isSettingsActive = location.startsWith('/settings');
 
   return (
     <div className={cn(
@@ -188,28 +198,69 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </div>
           )}
 
-          {bottomLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = location === link.href;
-            return (
-              <Link 
-                key={link.href} 
-                href={link.href}
+          {collapsed ? (
+            <Link 
+              href="/settings/rules"
+              className={cn(
+                "flex items-center rounded-md py-2 text-sm font-medium transition-colors justify-center px-2",
+                isSettingsActive 
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              )}
+              data-testid="nav-settings"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
+          ) : (
+            <div>
+              <button
+                onClick={() => setSettingsExpanded(!settingsExpanded)}
                 className={cn(
-                  "flex items-center rounded-md py-2 text-sm font-medium transition-colors",
-                  collapsed ? "justify-center px-2" : "px-3",
-                  isActive 
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+                  "flex w-full items-center justify-between rounded-md py-2 px-3 text-sm font-medium transition-colors",
+                  isSettingsActive 
+                    ? "bg-sidebar-primary/50 text-sidebar-primary-foreground" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
-                data-testid={`nav-${link.label.toLowerCase()}`}
-                title={collapsed ? link.label : undefined}
+                data-testid="nav-settings-toggle"
               >
-                <Icon className={cn("h-5 w-5", !collapsed && "mr-3")} />
-                {!collapsed && link.label}
-              </Link>
-            );
-          })}
+                <div className="flex items-center">
+                  <Settings className="h-5 w-5 mr-3" />
+                  Settings
+                </div>
+                {settingsExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+              
+              {settingsExpanded && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                  {settingsSubItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center rounded-md py-1.5 px-2 text-sm transition-colors",
+                          isActive 
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium" 
+                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                        data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <Icon className="h-4 w-4 mr-2" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
       </div>
 

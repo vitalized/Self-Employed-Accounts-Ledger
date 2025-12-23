@@ -18,6 +18,7 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/reports/:reportId" component={Reports} />
       <Route path="/settings" component={Settings} />
+      <Route path="/settings/:sectionId" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
