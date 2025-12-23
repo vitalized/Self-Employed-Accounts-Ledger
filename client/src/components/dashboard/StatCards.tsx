@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
 import { ArrowUpRight, ArrowDownRight, Wallet, ChevronUp, ChevronDown } from "lucide-react";
@@ -127,14 +128,14 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     if (animationPhase !== 'idle') return;
 
     if (activeTab === tab) {
-      const currentHeight = containerRef.current?.scrollHeight || measureHeight(displayedTab);
-      setContainerHeight(currentHeight);
-      setAnimationPhase('collapsing');
-      setPendingTab(null);
+      const currentHeight = containerRef.current?.getBoundingClientRect().height || measureHeight(displayedTab);
+      flushSync(() => {
+        setContainerHeight(currentHeight);
+        setAnimationPhase('collapsing');
+        setPendingTab(null);
+      });
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setContainerHeight(0);
-        });
+        setContainerHeight(0);
       });
     } else if (activeTab === null) {
       setActiveTab(tab);
@@ -147,14 +148,14 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         });
       });
     } else {
-      const currentHeight = containerRef.current?.scrollHeight || measureHeight(displayedTab);
-      setContainerHeight(currentHeight);
-      setPendingTab(tab);
-      setAnimationPhase('collapsing');
+      const currentHeight = containerRef.current?.getBoundingClientRect().height || measureHeight(displayedTab);
+      flushSync(() => {
+        setContainerHeight(currentHeight);
+        setPendingTab(tab);
+        setAnimationPhase('collapsing');
+      });
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setContainerHeight(0);
-        });
+        setContainerHeight(0);
       });
     }
   }, [activeTab, animationPhase, displayedTab, measureHeight]);
