@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
 import { ArrowUpRight, ArrowDownRight, Wallet, ChevronUp, ChevronDown } from "lucide-react";
@@ -83,6 +83,16 @@ const formatDateLabel = (label: string) => {
 
 export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const [activeTab, setActiveTab] = useState<TabType>(null);
+  const [displayedTab, setDisplayedTab] = useState<TabType>(null);
+  const [animationPhase, setAnimationPhase] = useState<'idle' | 'collapsing' | 'expanding'>('idle');
+  const [containerHeight, setContainerHeight] = useState<number | 'auto'>(0);
+  const [pendingTab, setPendingTab] = useState<TabType>(null);
+  
+  const profitRef = useRef<HTMLDivElement>(null);
+  const incomeRef = useRef<HTMLDivElement>(null);
+  const expensesRef = useRef<HTMLDivElement>(null);
+  const taxRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income');
   const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense');
@@ -95,9 +105,92 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   
   const formatCurrency = (value: number) => `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const toggleTab = (tab: TabType) => {
-    setActiveTab(activeTab === tab ? null : tab);
-  };
+  const getContentRef = useCallback((tab: TabType) => {
+    switch (tab) {
+      case 'profit': return profitRef;
+      case 'income': return incomeRef;
+      case 'expenses': return expensesRef;
+      case 'tax': return taxRef;
+      default: return null;
+    }
+  }, []);
+
+  const measureHeight = useCallback((tab: TabType): number => {
+    const ref = getContentRef(tab);
+    if (ref?.current) {
+      return ref.current.scrollHeight;
+    }
+    return 0;
+  }, [getContentRef]);
+
+  const toggleTab = useCallback((tab: TabType) => {
+    if (animationPhase !== 'idle') return;
+
+    if (activeTab === tab) {
+      const currentHeight = containerRef.current?.scrollHeight || measureHeight(displayedTab);
+      setContainerHeight(currentHeight);
+      setAnimationPhase('collapsing');
+      setPendingTab(null);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setContainerHeight(0);
+        });
+      });
+    } else if (activeTab === null) {
+      setActiveTab(tab);
+      setDisplayedTab(tab);
+      setAnimationPhase('expanding');
+      setContainerHeight(0);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setContainerHeight(measureHeight(tab));
+        });
+      });
+    } else {
+      const currentHeight = containerRef.current?.scrollHeight || measureHeight(displayedTab);
+      setContainerHeight(currentHeight);
+      setPendingTab(tab);
+      setAnimationPhase('collapsing');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setContainerHeight(0);
+        });
+      });
+    }
+  }, [activeTab, animationPhase, displayedTab, measureHeight]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleTransitionEnd = (e: TransitionEvent) => {
+      if (e.propertyName !== 'height') return;
+
+      if (animationPhase === 'collapsing') {
+        if (pendingTab) {
+          setActiveTab(pendingTab);
+          setDisplayedTab(pendingTab);
+          setAnimationPhase('expanding');
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setContainerHeight(measureHeight(pendingTab));
+            });
+          });
+          setPendingTab(null);
+        } else {
+          setActiveTab(null);
+          setDisplayedTab(null);
+          setAnimationPhase('idle');
+        }
+      } else if (animationPhase === 'expanding') {
+        setContainerHeight('auto');
+        setAnimationPhase('idle');
+      }
+    };
+
+    container.addEventListener('transitionend', handleTransitionEnd);
+    return () => container.removeEventListener('transitionend', handleTransitionEnd);
+  }, [animationPhase, pendingTab, measureHeight]);
 
   const expensesByCategory = expenseTransactions.reduce((acc, t) => {
     const category = t.category || 'Uncategorized';
@@ -117,6 +210,10 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         ? `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} rounded-b-none ${baseColor} -mb-[18px] relative z-10`
         : "border border-slate-200 dark:border-slate-800"
     );
+  };
+
+  const isContentVisible = (tab: TabType) => {
+    return displayedTab === tab;
   };
 
   return (
@@ -207,252 +304,242 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         </Card>
       </div>
       
-      {/* Profit Breakdown Panel */}
-      <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out",
-        activeTab === 'profit' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-      )}>
-        <Card className="border-2 border-blue-500 dark:border-blue-500 rounded-tl-none rounded-tr-xl rounded-b-xl bg-blue-50 dark:bg-blue-950">
-          <CardContent className="pt-4">
-            <div className="grid gap-12 md:grid-cols-3">
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Calculation</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Total Income</span>
-                    <span className="font-medium text-emerald-600">{formatCurrency(businessIncome)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Total Expenses</span>
-                    <span className="font-medium text-red-500">-{formatCurrency(businessExpense)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t pt-2">
-                    <span>Net Profit</span>
-                    <span className="text-blue-600">{formatCurrency(profit)}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Margins</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Profit Margin</span>
-                    <span className="font-medium">{businessIncome > 0 ? ((profit / businessIncome) * 100).toFixed(1) : 0}%</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Expense Ratio</span>
-                    <span className="font-medium">{businessIncome > 0 ? ((businessExpense / businessIncome) * 100).toFixed(1) : 0}%</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">After Tax</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Gross Profit</span>
-                    <span className="font-medium">{formatCurrency(profit)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Est. Tax</span>
-                    <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t pt-2">
-                    <span>Take Home</span>
-                    <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Income Breakdown Panel */}
-      <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out",
-        activeTab === 'income' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-      )}>
-        <Card className="border-2 border-emerald-500 dark:border-emerald-500 rounded-xl bg-emerald-50 dark:bg-emerald-950">
-          <CardContent className="pt-4">
-            <div className="grid gap-12 md:grid-cols-3">
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Total Transactions</span>
-                    <span className="font-medium">{incomeTransactions.length}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Average Value</span>
-                    <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? businessIncome / incomeTransactions.length : 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t pt-2">
-                    <span>Total Income</span>
-                    <span className="text-emerald-600">{formatCurrency(businessIncome)}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Transactions</h4>
-                <div className="space-y-2">
-                  {incomeTransactions
-                    .sort((a, b) => b.amount - a.amount)
-                    .slice(0, 3)
-                    .map((t, i) => (
-                      <div key={i} className="flex justify-between text-sm">
-                        <span className="truncate max-w-[150px]">{t.description}</span>
-                        <span className="font-medium">{formatCurrency(t.amount)}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Value Range</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Smallest</span>
-                    <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.min(...incomeTransactions.map(t => t.amount)) : 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Largest</span>
-                    <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.max(...incomeTransactions.map(t => t.amount)) : 0)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Expenses Breakdown Panel */}
-      <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out",
-        activeTab === 'expenses' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-      )}>
-        <Card className="border-2 border-red-500 dark:border-red-500 rounded-xl bg-red-50 dark:bg-red-950">
-          <CardContent className="pt-4">
-            <div className="grid gap-12 md:grid-cols-3">
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Categories</h4>
-                <div className="space-y-2">
-                  {sortedExpenseCategories.slice(0, 4).map(([category, amount], i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="truncate max-w-[150px]">{category}</span>
-                      <span className="font-medium">{formatCurrency(amount)}</span>
+      <div 
+        ref={containerRef}
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{ height: containerHeight }}
+      >
+        <div ref={profitRef} className={cn(!isContentVisible('profit') && 'hidden')}>
+          <Card className="border-2 border-blue-500 dark:border-blue-500 rounded-tl-none rounded-tr-xl rounded-b-xl bg-blue-50 dark:bg-blue-950">
+            <CardContent className="pt-4">
+              <div className="grid gap-12 md:grid-cols-3">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Calculation</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Income</span>
+                      <span className="font-medium text-emerald-600">{formatCurrency(businessIncome)}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Total Transactions</span>
-                    <span className="font-medium">{expenseTransactions.length}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Average Value</span>
-                    <span className="font-medium">{formatCurrency(expenseTransactions.length > 0 ? businessExpense / expenseTransactions.length : 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Categories Used</span>
-                    <span className="font-medium">{Object.keys(expensesByCategory).length}</span>
+                    <div className="flex justify-between text-sm">
+                      <span>Total Expenses</span>
+                      <span className="font-medium text-red-500">-{formatCurrency(businessExpense)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t pt-2">
+                      <span>Net Profit</span>
+                      <span className="text-blue-600">{formatCurrency(profit)}</span>
+                    </div>
                   </div>
                 </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Margins</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Profit Margin</span>
+                      <span className="font-medium">{businessIncome > 0 ? ((profit / businessIncome) * 100).toFixed(1) : 0}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Expense Ratio</span>
+                      <span className="font-medium">{businessIncome > 0 ? ((businessExpense / businessIncome) * 100).toFixed(1) : 0}%</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">After Tax</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Gross Profit</span>
+                      <span className="font-medium">{formatCurrency(profit)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Est. Tax</span>
+                      <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t pt-2">
+                      <span>Take Home</span>
+                      <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Expenses</h4>
-                <div className="space-y-2">
-                  {expenseTransactions
-                    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
-                    .slice(0, 3)
-                    .map((t, i) => (
+            </CardContent>
+          </Card>
+        </div>
+
+        <div ref={incomeRef} className={cn(!isContentVisible('income') && 'hidden')}>
+          <Card className="border-2 border-emerald-500 dark:border-emerald-500 rounded-xl bg-emerald-50 dark:bg-emerald-950">
+            <CardContent className="pt-4">
+              <div className="grid gap-12 md:grid-cols-3">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Transactions</span>
+                      <span className="font-medium">{incomeTransactions.length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Average Value</span>
+                      <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? businessIncome / incomeTransactions.length : 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t pt-2">
+                      <span>Total Income</span>
+                      <span className="text-emerald-600">{formatCurrency(businessIncome)}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Transactions</h4>
+                  <div className="space-y-2">
+                    {incomeTransactions
+                      .sort((a, b) => b.amount - a.amount)
+                      .slice(0, 3)
+                      .map((t, i) => (
+                        <div key={i} className="flex justify-between text-sm">
+                          <span className="truncate max-w-[150px]">{t.description}</span>
+                          <span className="font-medium">{formatCurrency(t.amount)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Value Range</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Smallest</span>
+                      <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.min(...incomeTransactions.map(t => t.amount)) : 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Largest</span>
+                      <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.max(...incomeTransactions.map(t => t.amount)) : 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div ref={expensesRef} className={cn(!isContentVisible('expenses') && 'hidden')}>
+          <Card className="border-2 border-red-500 dark:border-red-500 rounded-xl bg-red-50 dark:bg-red-950">
+            <CardContent className="pt-4">
+              <div className="grid gap-12 md:grid-cols-3">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Categories</h4>
+                  <div className="space-y-2">
+                    {sortedExpenseCategories.slice(0, 4).map(([category, amount], i) => (
                       <div key={i} className="flex justify-between text-sm">
-                        <span className="truncate max-w-[150px]">{t.description}</span>
-                        <span className="font-medium text-red-500">{formatCurrency(Math.abs(t.amount))}</span>
+                        <span className="truncate max-w-[150px]">{category}</span>
+                        <span className="font-medium">{formatCurrency(amount)}</span>
                       </div>
                     ))}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Transactions</span>
+                      <span className="font-medium">{expenseTransactions.length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Average Value</span>
+                      <span className="font-medium">{formatCurrency(expenseTransactions.length > 0 ? businessExpense / expenseTransactions.length : 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Categories Used</span>
+                      <span className="font-medium">{Object.keys(expensesByCategory).length}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Expenses</h4>
+                  <div className="space-y-2">
+                    {expenseTransactions
+                      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+                      .slice(0, 3)
+                      .map((t, i) => (
+                        <div key={i} className="flex justify-between text-sm">
+                          <span className="truncate max-w-[150px]">{t.description}</span>
+                          <span className="font-medium text-red-500">{formatCurrency(Math.abs(t.amount))}</span>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Tax Breakdown Panel */}
-      <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out",
-        activeTab === 'tax' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-      )}>
-        <Card className="border-2 border-amber-500 dark:border-amber-500 rounded-tr-none rounded-tl-xl rounded-b-xl bg-amber-50 dark:bg-amber-950">
-          <CardContent className="pt-4">
-            <div className="grid gap-12 md:grid-cols-3">
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tax Components</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Income Tax</span>
-                    <span className="font-medium">{formatCurrency(taxBreakdown.incomeTax)}</span>
+        <div ref={taxRef} className={cn(!isContentVisible('tax') && 'hidden')}>
+          <Card className="border-2 border-amber-500 dark:border-amber-500 rounded-tr-none rounded-tl-xl rounded-b-xl bg-amber-50 dark:bg-amber-950">
+            <CardContent className="pt-4">
+              <div className="grid gap-12 md:grid-cols-3">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tax Components</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Income Tax</span>
+                      <span className="font-medium">{formatCurrency(taxBreakdown.incomeTax)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Class 4 NI</span>
+                      <span className="font-medium">{formatCurrency(taxBreakdown.class4NI)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Class 2 NI</span>
+                      <span className="font-medium">{formatCurrency(taxBreakdown.class2NI)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t pt-2">
+                      <span>Total Tax Due</span>
+                      <span className="text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Class 4 NI</span>
-                    <span className="font-medium">{formatCurrency(taxBreakdown.class4NI)}</span>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Income Tax Bands</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Personal Allowance</span>
+                      <span className="font-medium text-green-600">{formatCurrency(taxBreakdown.personalAllowance)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Basic Rate (20%)</span>
+                      <span className="font-medium">{formatCurrency(taxBreakdown.basicRateTax)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Higher Rate (40%)</span>
+                      <span className="font-medium">{formatCurrency(taxBreakdown.higherRateTax)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Class 2 NI</span>
-                    <span className="font-medium">{formatCurrency(taxBreakdown.class2NI)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t pt-2">
-                    <span>Total Tax Due</span>
-                    <span className="text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</span>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Take Home</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Gross Profit</span>
+                      <span className="font-medium">{formatCurrency(profit)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Less Tax</span>
+                      <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t pt-2">
+                      <span>Net Income</span>
+                      <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Income Tax Bands</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Personal Allowance</span>
-                    <span className="font-medium text-green-600">{formatCurrency(taxBreakdown.personalAllowance)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Basic Rate (20%)</span>
-                    <span className="font-medium">{formatCurrency(taxBreakdown.basicRateTax)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Higher Rate (40%)</span>
-                    <span className="font-medium">{formatCurrency(taxBreakdown.higherRateTax)}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Take Home</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Gross Profit</span>
-                    <span className="font-medium">{formatCurrency(profit)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Less Tax</span>
-                    <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t pt-2">
-                    <span>Net Income</span>
-                    <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
