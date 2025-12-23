@@ -98,7 +98,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const profit = businessIncome - businessExpense;
   const taxBreakdown = calculateFullTaxBreakdown(profit);
   
-  const formatCurrency = (value: number) => `£${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const formatCurrency = (value: number) => `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-0">
