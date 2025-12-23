@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Transaction } from "@/lib/types";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts';
 import { parseISO, format } from "date-fns";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ProfitLossReportProps {
   transactions: Transaction[];
@@ -68,161 +67,124 @@ export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportPr
         <p className="text-muted-foreground">Tax Year {yearLabel}</p>
       </div>
 
-      <Tabs defaultValue="summary" className="w-full">
-        <TabsList data-testid="tabs-profit-loss">
-          <TabsTrigger value="summary" data-testid="tab-summary">Summary</TabsTrigger>
-          <TabsTrigger value="charts" data-testid="tab-charts">Charts</TabsTrigger>
-          <TabsTrigger value="details" data-testid="tab-details">Details</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="summary" className="mt-6 space-y-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">£{financials.income.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Expenses</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">£{financials.expenses.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">£{financials.netProfit.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{profitMargin}%</div>
-              </CardContent>
-            </Card>
-          </div>
-
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Quick Overview</CardTitle>
-              <CardDescription>Key financial metrics at a glance</CardDescription>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between py-2 border-b">
-                  <span>Total Revenue</span>
-                  <span className="font-medium text-green-600">£{financials.income.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>Total Expenses</span>
-                  <span className="font-medium text-red-600">-£{financials.expenses.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between py-3 border-t-2 font-bold text-lg">
-                  <span>Net Profit</span>
-                  <span className={financials.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    £{financials.netProfit.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
+              <div className="text-2xl font-bold text-green-600">£{financials.income.toLocaleString()}</div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="charts" className="mt-6 space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Monthly Income vs Expenses</CardTitle>
-              <CardDescription>Side-by-side comparison</CardDescription>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Expenses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} />
-                    <Tooltip 
-                      formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    />
-                    <Legend />
-                    <Bar dataKey="income" name="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <div className="text-2xl font-bold text-red-600">£{financials.expenses.toLocaleString()}</div>
             </CardContent>
           </Card>
-
           <Card>
-            <CardHeader>
-              <CardTitle>Cumulative Profit Trend</CardTitle>
-              <CardDescription>Running total over time</CardDescription>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={cumulativeData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} />
-                    <Tooltip 
-                      formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="cumulative" name="Cumulative Profit" stroke="#0ea5e9" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <div className="text-2xl font-bold">£{financials.netProfit.toLocaleString()}</div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="details" className="mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Detailed P&L Statement</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                  <div className="font-semibold">Revenue</div>
-                  <div className="text-right font-semibold">£{financials.income.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="font-medium text-muted-foreground">Operating Expenses by Category</div>
-                  {expenseData.map((item) => (
-                    <div key={item.name} className="grid grid-cols-2 gap-4 pl-4 text-sm">
-                      <div>{item.name}</div>
-                      <div className="text-right text-red-500">-£{item.value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
-                    </div>
-                  ))}
-                  <div className="grid grid-cols-2 gap-4 border-t pt-2 font-medium">
-                    <div>Total Expenses</div>
-                    <div className="text-right text-red-600">-£{financials.expenses.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+              <div className="text-2xl font-bold">{profitMargin}%</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Income vs Expenses</CardTitle>
+            <CardDescription>Side-by-side comparison</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} />
+                  <Tooltip 
+                    formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="income" name="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Cumulative Profit Trend</CardTitle>
+            <CardDescription>Running total over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={cumulativeData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value}`} />
+                  <Tooltip 
+                    formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="cumulative" name="Cumulative Profit" stroke="#0ea5e9" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Detailed P&L Statement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                <div className="font-semibold">Revenue</div>
+                <div className="text-right font-semibold">£{financials.income.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="font-medium text-muted-foreground">Operating Expenses by Category</div>
+                {expenseData.map((item) => (
+                  <div key={item.name} className="grid grid-cols-2 gap-4 pl-4 text-sm">
+                    <div>{item.name}</div>
+                    <div className="text-right text-red-500">-£{item.value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 border-t border-slate-200 dark:border-slate-800 pt-4 text-lg font-bold">
-                  <div>Net Profit</div>
-                  <div className="text-right">£{financials.netProfit.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+                ))}
+                <div className="grid grid-cols-2 gap-4 border-t pt-2 font-medium">
+                  <div>Total Expenses</div>
+                  <div className="text-right text-red-600">-£{financials.expenses.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-200 dark:border-slate-800 pt-4 text-lg font-bold">
+                <div>Net Profit</div>
+                <div className="text-right">£{financials.netProfit.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
