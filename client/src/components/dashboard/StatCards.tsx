@@ -114,14 +114,14 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     return cn(
       "cursor-pointer transition-all",
       isActive
-        ? `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} rounded-b-none ${baseColor} pb-6 mb-[-1rem] relative z-10`
+        ? `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} rounded-b-none ${baseColor} -mb-4 relative z-10`
         : "border border-slate-200 dark:border-slate-800"
     );
   };
 
   return (
     <div className="space-y-0">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pb-4">
         <Card 
           className={getCardClasses('profit', 'bg-blue-50 dark:bg-blue-950', 'border-blue-500 dark:border-blue-500')}
           onClick={() => toggleTab('profit')}
@@ -209,7 +209,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       
       {/* Profit Breakdown Panel */}
       <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out mt-4",
+        "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'profit' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
         <Card className="border-0 border-l-2 border-r-2 border-b-2 border-blue-500 dark:border-blue-500 rounded-t-none bg-blue-50 dark:bg-blue-950">
@@ -271,7 +271,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
 
       {/* Income Breakdown Panel */}
       <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out mt-4",
+        "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'income' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
         <Card className="border-0 border-l-2 border-r-2 border-b-2 border-emerald-500 dark:border-emerald-500 rounded-t-none bg-emerald-50 dark:bg-emerald-950">
@@ -330,7 +330,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
 
       {/* Expenses Breakdown Panel */}
       <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out mt-4",
+        "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'expenses' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
         <Card className="border-0 border-l-2 border-r-2 border-b-2 border-red-500 dark:border-red-500 rounded-t-none bg-red-50 dark:bg-red-950">
@@ -387,7 +387,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
 
       {/* Tax Breakdown Panel */}
       <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out mt-4",
+        "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'tax' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
         <Card className="border-0 border-l-2 border-r-2 border-b-2 border-amber-500 dark:border-amber-500 rounded-t-none bg-amber-50 dark:bg-amber-950">
