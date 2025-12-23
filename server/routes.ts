@@ -746,6 +746,7 @@ export async function registerRoutes(
 
         // Get all existing transactions once for this sync
         const existingTransactions = await storage.getTransactions();
+        const excludedFingerprintsSet = await storage.getExcludedFingerprints();
         
         for (const item of feedItems) {
           const feedItemUid = item.feedItemUid;
@@ -756,6 +757,20 @@ export async function registerRoutes(
           );
           
           if (alreadyExists) continue;
+          
+          // Check if this transaction fingerprint is excluded (user deleted and marked do not reimport)
+          const checkTxDate = new Date(item.transactionTime);
+          const checkTxDesc = item.counterPartyName || item.reference || "Unknown";
+          const checkTxAmount = item.direction === "IN" 
+            ? item.amount.minorUnits / 100 
+            : -(item.amount.minorUnits / 100);
+          const checkTxRef = item.reference || null;
+          const checkFingerprint = createTransactionFingerprint(checkTxDate, checkTxAmount, checkTxDesc, checkTxRef);
+          
+          if (excludedFingerprintsSet.has(checkFingerprint)) {
+            console.log(`Skipping excluded transaction: ${checkTxDesc} on ${checkTxDate.toISOString()}`);
+            continue;
+          }
 
           // Convert Starling feed item to our transaction format
           const isIncoming = item.direction === "IN";
@@ -990,8 +1005,9 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid CSV format. Expected Starling Bank statement format." });
       }
 
-      // Get existing fingerprints to check for duplicates
+      // Get existing fingerprints and excluded fingerprints to check for duplicates
       const existingFingerprints = await storage.getExistingFingerprints();
+      const excludedFingerprints = await storage.getExcludedFingerprints();
 
       // Parse CSV rows
       const parseCSVLine = (line: string): string[] => {
@@ -1060,6 +1076,18 @@ export async function registerRoutes(
 
           // Create fingerprint for duplicate detection
           const fingerprint = createTransactionFingerprint(date, amount, counterParty, reference);
+          
+          // Check if this transaction is excluded (user deleted and marked as do not reimport)
+          if (excludedFingerprints.has(fingerprint)) {
+            skipped++;
+            skippedTransactions.push({
+              date: dateStr,
+              description: counterParty,
+              amount,
+              reason: "Transaction excluded by user (do not reimport)"
+            });
+            continue;
+          }
           
           // Check if this transaction already exists (exact fingerprint match in DB or current batch)
           if (existingFingerprints.has(fingerprint)) {

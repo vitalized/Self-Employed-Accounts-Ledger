@@ -121,3 +121,22 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
 
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
+
+// Excluded fingerprints - transactions that should not be re-imported
+export const excludedFingerprints = pgTable("excluded_fingerprints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fingerprint: text("fingerprint").notNull().unique(),
+  description: text("description").notNull(), // For reference
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  date: timestamp("date").notNull(),
+  reason: text("reason").default('User deleted'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExcludedFingerprintSchema = createInsertSchema(excludedFingerprints).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertExcludedFingerprint = z.infer<typeof insertExcludedFingerprintSchema>;
+export type ExcludedFingerprint = typeof excludedFingerprints.$inferSelect;

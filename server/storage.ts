@@ -1,4 +1,4 @@
-import { users, transactions, settings, categorizationRules, transactionNotes, categories, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory } from "@shared/schema";
+import { users, transactions, settings, categorizationRules, transactionNotes, categories, excludedFingerprints, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory, type InsertExcludedFingerprint, type ExcludedFingerprint } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, ilike, between, sql } from "drizzle-orm";
 
@@ -50,6 +50,11 @@ export interface IStorage {
   deleteCategory(id: string): Promise<boolean>;
   reassignTransactionCategory(oldCategory: string, newCategory: string): Promise<number>;
   seedDefaultCategories(): Promise<void>;
+  
+  // Exclusion methods
+  getExcludedFingerprints(): Promise<Set<string>>;
+  addExcludedFingerprint(exclusion: InsertExcludedFingerprint): Promise<ExcludedFingerprint>;
+  isExcluded(fingerprint: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -457,6 +462,29 @@ export class DatabaseStorage implements IStorage {
     for (const cat of [...expenseCategories, ...incomeCategories]) {
       await this.createCategory(cat);
     }
+  }
+
+  // Exclusion methods
+  async getExcludedFingerprints(): Promise<Set<string>> {
+    const excluded = await db.select({ fingerprint: excludedFingerprints.fingerprint })
+      .from(excludedFingerprints);
+    return new Set(excluded.map(e => e.fingerprint));
+  }
+
+  async addExcludedFingerprint(exclusion: InsertExcludedFingerprint): Promise<ExcludedFingerprint> {
+    const [result] = await db
+      .insert(excludedFingerprints)
+      .values(exclusion)
+      .returning();
+    return result;
+  }
+
+  async isExcluded(fingerprint: string): Promise<boolean> {
+    const [result] = await db
+      .select()
+      .from(excludedFingerprints)
+      .where(eq(excludedFingerprints.fingerprint, fingerprint));
+    return !!result;
   }
 }
 
