@@ -212,7 +212,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'profit' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
-        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-blue-500 dark:border-blue-500 rounded-t-none bg-blue-50 dark:bg-blue-950">
+        <Card className="border-2 border-blue-500 dark:border-blue-500 rounded-tl-none rounded-tr-xl rounded-b-xl bg-blue-50 dark:bg-blue-950">
           <CardContent className="pt-4">
             <div className="grid gap-12 md:grid-cols-3">
               <div className="space-y-3">
@@ -274,7 +274,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'income' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
-        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-emerald-500 dark:border-emerald-500 rounded-t-none bg-emerald-50 dark:bg-emerald-950">
+        <Card className="border-2 border-emerald-500 dark:border-emerald-500 rounded-xl bg-emerald-50 dark:bg-emerald-950">
           <CardContent className="pt-4">
             <div className="grid gap-12 md:grid-cols-3">
               <div className="space-y-3">
@@ -333,7 +333,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'expenses' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
-        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-red-500 dark:border-red-500 rounded-t-none bg-red-50 dark:bg-red-950">
+        <Card className="border-2 border-red-500 dark:border-red-500 rounded-xl bg-red-50 dark:bg-red-950">
           <CardContent className="pt-4">
             <div className="grid gap-12 md:grid-cols-3">
               <div className="space-y-3">
@@ -390,7 +390,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         "overflow-hidden transition-all duration-300 ease-in-out",
         activeTab === 'tax' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
-        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-amber-500 dark:border-amber-500 rounded-t-none bg-amber-50 dark:bg-amber-950">
+        <Card className="border-2 border-amber-500 dark:border-amber-500 rounded-tr-none rounded-tl-xl rounded-b-xl bg-amber-50 dark:bg-amber-950">
           <CardContent className="pt-4">
             <div className="grid gap-12 md:grid-cols-3">
               <div className="space-y-3">
