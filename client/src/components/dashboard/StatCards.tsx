@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
-import { ArrowUpRight, ArrowDownRight, PoundSterling, Wallet, Info, BarChart3, ChevronUp } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowUpRight, ArrowDownRight, Wallet, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StatCardsProps {
@@ -22,10 +21,11 @@ interface TaxBreakdown {
   effectiveRate: number;
 }
 
+type TabType = 'profit' | 'income' | 'expenses' | 'tax' | null;
+
 const calculateFullTaxBreakdown = (profit: number): TaxBreakdown => {
   const personalAllowance = Math.min(profit, 12570);
   
-  // Income Tax calculation
   let incomeTax = 0;
   let basicRateTax = 0;
   let higherRateTax = 0;
@@ -46,7 +46,6 @@ const calculateFullTaxBreakdown = (profit: number): TaxBreakdown => {
     incomeTax = basicRateTax + higherRateTax + additionalRateTax;
   }
   
-  // Class 4 NI: 6% on profits between £12,570 and £50,270, 2% above
   let class4NI = 0;
   if (profit > 12570) {
     const class4LowerBand = Math.min(Math.max(profit - 12570, 0), 50270 - 12570);
@@ -56,7 +55,6 @@ const calculateFullTaxBreakdown = (profit: number): TaxBreakdown => {
     }
   }
   
-  // Class 2 NI: £3.45/week if profits over £12,570 (approx £179.40/year)
   const class2NI = profit > 12570 ? 179.40 : 0;
   
   const totalTax = incomeTax + class4NI + class2NI;
@@ -84,29 +82,58 @@ const formatDateLabel = (label: string) => {
 };
 
 export function StatCards({ transactions, dateLabel }: StatCardsProps) {
-  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>(null);
   
-  // Calculate totals
-  const businessIncome = transactions
-    .filter(t => t.type === 'Business' && t.businessType === 'Income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const businessExpense = transactions
-    .filter(t => t.type === 'Business' && t.businessType === 'Expense')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income');
+  const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense');
+  
+  const businessIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const businessExpense = expenseTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const profit = businessIncome - businessExpense;
   const taxBreakdown = calculateFullTaxBreakdown(profit);
   
   const formatCurrency = (value: number) => `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const toggleTab = (tab: TabType) => {
+    setActiveTab(activeTab === tab ? null : tab);
+  };
+
+  const expensesByCategory = expenseTransactions.reduce((acc, t) => {
+    const category = t.category || 'Uncategorized';
+    acc[category] = (acc[category] || 0) + Math.abs(t.amount);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sortedExpenseCategories = Object.entries(expensesByCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  const getCardClasses = (tab: TabType, baseColor: string, borderColor: string) => {
+    const isActive = activeTab === tab;
+    return cn(
+      "cursor-pointer transition-all",
+      isActive
+        ? `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} rounded-b-none ${baseColor}`
+        : "border border-slate-200 dark:border-slate-800"
+    );
+  };
+
   return (
     <div className="space-y-0">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card 
+          className={getCardClasses('profit', 'bg-blue-50 dark:bg-blue-950', 'border-blue-500 dark:border-blue-500')}
+          onClick={() => toggleTab('profit')}
+          data-testid="card-profit"
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Business Profit</CardTitle>
-            <Wallet className="h-4 w-4 text-primary" />
+            {activeTab === 'profit' ? (
+              <ChevronUp className="h-4 w-4 text-blue-500" />
+            ) : (
+              <Wallet className="h-4 w-4 text-blue-500" />
+            )}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(profit)}</div>
@@ -116,10 +143,18 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card 
+          className={getCardClasses('income', 'bg-emerald-50 dark:bg-emerald-950', 'border-emerald-500 dark:border-emerald-500')}
+          onClick={() => toggleTab('income')}
+          data-testid="card-income"
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Business Income</CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+            {activeTab === 'income' ? (
+              <ChevronUp className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+            )}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">{formatCurrency(businessIncome)}</div>
@@ -129,10 +164,18 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card 
+          className={getCardClasses('expenses', 'bg-red-50 dark:bg-red-950', 'border-red-500 dark:border-red-500')}
+          onClick={() => toggleTab('expenses')}
+          data-testid="card-expenses"
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Business Expenses</CardTitle>
-            <ArrowDownRight className="h-4 w-4 text-red-500" />
+            {activeTab === 'expenses' ? (
+              <ChevronUp className="h-4 w-4 text-red-500" />
+            ) : (
+              <ArrowDownRight className="h-4 w-4 text-red-500" />
+            )}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{formatCurrency(businessExpense)}</div>
@@ -143,37 +186,20 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         </Card>
 
         <Card 
-          className={cn(
-            "bg-slate-50 dark:bg-slate-900 cursor-pointer transition-all",
-            showTaxBreakdown 
-              ? "border-t-2 border-l-2 border-r-2 border-b-0 border-amber-500 dark:border-amber-500 rounded-b-none" 
-              : "border border-slate-200 dark:border-slate-800"
-          )}
-          onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
+          className={getCardClasses('tax', 'bg-amber-50 dark:bg-amber-950', 'border-amber-500 dark:border-amber-500')}
+          onClick={() => toggleTab('tax')}
           data-testid="card-tax-owed"
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div className="flex items-center space-x-2">
-              <CardTitle className="text-sm font-medium">Est. Tax Owed</CardTitle>
-              <Tooltip>
-                <TooltipTrigger onClick={(e) => e.stopPropagation()}>
-                  <Info className="h-3 w-3 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Click to see detailed breakdown</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="flex items-center gap-2">
-              {showTaxBreakdown ? (
-                <ChevronUp className="h-4 w-4 text-amber-500" />
-              ) : (
-                <BarChart3 className="h-4 w-4 text-amber-500" />
-              )}
-            </div>
+            <CardTitle className="text-sm font-medium">Est. Tax Owed</CardTitle>
+            {activeTab === 'tax' ? (
+              <ChevronUp className="h-4 w-4 text-amber-500" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-amber-500" />
+            )}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(taxBreakdown.totalTax)}</div>
+            <div className="text-2xl font-bold text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</div>
             <p className="text-xs text-muted-foreground">
               {taxBreakdown.effectiveRate.toFixed(1)}% effective rate
             </p>
@@ -181,11 +207,190 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         </Card>
       </div>
       
+      {/* Profit Breakdown Panel */}
       <div className={cn(
         "overflow-hidden transition-all duration-300 ease-in-out",
-        showTaxBreakdown ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+        activeTab === 'profit' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
       )}>
-        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-amber-500 dark:border-amber-500 rounded-t-none bg-slate-50 dark:bg-slate-900">
+        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-blue-500 dark:border-blue-500 rounded-t-none bg-blue-50 dark:bg-blue-950">
+          <CardContent className="pt-4">
+            <div className="grid gap-12 md:grid-cols-3">
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Calculation</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Total Income</span>
+                    <span className="font-medium text-emerald-600">{formatCurrency(businessIncome)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Total Expenses</span>
+                    <span className="font-medium text-red-500">-{formatCurrency(businessExpense)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold border-t pt-2">
+                    <span>Net Profit</span>
+                    <span className="text-blue-600">{formatCurrency(profit)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Margins</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Profit Margin</span>
+                    <span className="font-medium">{businessIncome > 0 ? ((profit / businessIncome) * 100).toFixed(1) : 0}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Expense Ratio</span>
+                    <span className="font-medium">{businessIncome > 0 ? ((businessExpense / businessIncome) * 100).toFixed(1) : 0}%</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">After Tax</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Gross Profit</span>
+                    <span className="font-medium">{formatCurrency(profit)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Est. Tax</span>
+                    <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold border-t pt-2">
+                    <span>Take Home</span>
+                    <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Income Breakdown Panel */}
+      <div className={cn(
+        "overflow-hidden transition-all duration-300 ease-in-out",
+        activeTab === 'income' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+      )}>
+        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-emerald-500 dark:border-emerald-500 rounded-t-none bg-emerald-50 dark:bg-emerald-950">
+          <CardContent className="pt-4">
+            <div className="grid gap-12 md:grid-cols-3">
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Total Transactions</span>
+                    <span className="font-medium">{incomeTransactions.length}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Average Value</span>
+                    <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? businessIncome / incomeTransactions.length : 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold border-t pt-2">
+                    <span>Total Income</span>
+                    <span className="text-emerald-600">{formatCurrency(businessIncome)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Transactions</h4>
+                <div className="space-y-2">
+                  {incomeTransactions
+                    .sort((a, b) => b.amount - a.amount)
+                    .slice(0, 3)
+                    .map((t, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span className="truncate max-w-[150px]">{t.description}</span>
+                        <span className="font-medium">{formatCurrency(t.amount)}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Value Range</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Smallest</span>
+                    <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.min(...incomeTransactions.map(t => t.amount)) : 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Largest</span>
+                    <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.max(...incomeTransactions.map(t => t.amount)) : 0)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Expenses Breakdown Panel */}
+      <div className={cn(
+        "overflow-hidden transition-all duration-300 ease-in-out",
+        activeTab === 'expenses' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+      )}>
+        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-red-500 dark:border-red-500 rounded-t-none bg-red-50 dark:bg-red-950">
+          <CardContent className="pt-4">
+            <div className="grid gap-12 md:grid-cols-3">
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Categories</h4>
+                <div className="space-y-2">
+                  {sortedExpenseCategories.slice(0, 4).map(([category, amount], i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="truncate max-w-[150px]">{category}</span>
+                      <span className="font-medium">{formatCurrency(amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Total Transactions</span>
+                    <span className="font-medium">{expenseTransactions.length}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Average Value</span>
+                    <span className="font-medium">{formatCurrency(expenseTransactions.length > 0 ? businessExpense / expenseTransactions.length : 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Categories Used</span>
+                    <span className="font-medium">{Object.keys(expensesByCategory).length}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Expenses</h4>
+                <div className="space-y-2">
+                  {expenseTransactions
+                    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+                    .slice(0, 3)
+                    .map((t, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span className="truncate max-w-[150px]">{t.description}</span>
+                        <span className="font-medium text-red-500">{formatCurrency(Math.abs(t.amount))}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tax Breakdown Panel */}
+      <div className={cn(
+        "overflow-hidden transition-all duration-300 ease-in-out",
+        activeTab === 'tax' ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+      )}>
+        <Card className="border-0 border-l-2 border-r-2 border-b-2 border-amber-500 dark:border-amber-500 rounded-t-none bg-amber-50 dark:bg-amber-950">
           <CardContent className="pt-4">
             <div className="grid gap-12 md:grid-cols-3">
               <div className="space-y-3">
