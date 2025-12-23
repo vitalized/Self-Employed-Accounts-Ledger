@@ -145,7 +145,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
         <Card 
           className={cn(
             "bg-slate-50 border-slate-200 dark:bg-slate-900 dark:border-slate-800 cursor-pointer transition-all",
-            showTaxBreakdown && "border-amber-500 border-2 border-b-slate-200 dark:border-b-slate-800 rounded-b-none"
+            showTaxBreakdown && "border-amber-500 border-2 border-b-0 rounded-b-none"
           )}
           onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
           data-testid="card-tax-owed"
@@ -180,10 +180,10 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       </div>
       
       <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out mt-4",
-        showTaxBreakdown ? "max-h-96 opacity-100" : "max-h-0 opacity-0 mt-0"
+        "overflow-hidden transition-all duration-300 ease-in-out",
+        showTaxBreakdown ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
       )}>
-        <Card className="border-amber-500 border-2 bg-slate-50 dark:bg-slate-900">
+        <Card className="border-amber-500 border-2 border-t-0 rounded-t-none bg-slate-50 dark:bg-slate-900">
           <CardContent className="pt-4">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-3">
