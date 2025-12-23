@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, CheckCircle, AlertTriangle } from "lucide-react";
-import { parseISO, subMonths, isAfter, format } from "date-fns";
+import { AlertCircle, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { parseISO, subMonths, isAfter, isBefore, format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts';
 
 interface VATSummaryReportProps {
@@ -17,9 +18,38 @@ const VAT_APPROACHING = 75000;
 const VAT_DANGER = 85000;
 
 export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportProps) {
+  const [referenceDate, setReferenceDate] = useState(() => new Date());
+  
+  const earliestTransactionDate = useMemo(() => {
+    const incomeDates = transactions
+      .filter(t => t.type === 'Business' && t.businessType === 'Income')
+      .map(t => parseISO(t.date));
+    return incomeDates.length > 0 ? new Date(Math.min(...incomeDates.map(d => d.getTime()))) : new Date();
+  }, [transactions]);
+
+  const canGoBack = isAfter(startOfMonth(referenceDate), startOfMonth(earliestTransactionDate));
+  const canGoForward = isBefore(startOfMonth(referenceDate), startOfMonth(new Date()));
+  const isCurrentMonth = format(referenceDate, 'yyyy-MM') === format(new Date(), 'yyyy-MM');
+
+  const goToPreviousMonth = () => {
+    if (canGoBack) {
+      setReferenceDate(prev => subMonths(prev, 1));
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (canGoForward) {
+      setReferenceDate(prev => addMonths(prev, 1));
+    }
+  };
+
+  const goToCurrentMonth = () => {
+    setReferenceDate(new Date());
+  };
+
   const { taxYearIncome, rollingIncome, monthlyBreakdown, status, cumulativeData } = useMemo(() => {
-    const now = new Date();
-    const twelveMonthsAgo = subMonths(now, 12);
+    const endOfReferenceMonth = endOfMonth(referenceDate);
+    const twelveMonthsAgo = subMonths(startOfMonth(referenceDate), 11);
     
     let taxYearTotal = 0;
     let rollingTotal = 0;
@@ -32,7 +62,8 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
         
         taxYearTotal += amount;
         
-        if (isAfter(date, twelveMonthsAgo)) {
+        if ((isAfter(date, twelveMonthsAgo) || format(date, 'yyyy-MM') === format(twelveMonthsAgo, 'yyyy-MM')) && 
+            (isBefore(date, endOfReferenceMonth) || format(date, 'yyyy-MM') === format(endOfReferenceMonth, 'yyyy-MM'))) {
           rollingTotal += amount;
           const key = format(date, 'yyyy-MM');
           months[key] = (months[key] || 0) + amount;
@@ -68,7 +99,7 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
       status: statusLevel,
       cumulativeData: cumulativeMonthly
     };
-  }, [transactions]);
+  }, [transactions, referenceDate]);
 
   const percentage = Math.min((rollingIncome / VAT_THRESHOLD) * 100, 100);
   const remaining = Math.max(VAT_THRESHOLD - rollingIncome, 0);
@@ -86,6 +117,49 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
     <div className="p-6 space-y-6">
       <Card className={`${statusConfig[status].bg} ${statusConfig[status].border} border-2`}>
         <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={goToPreviousMonth}
+              disabled={!canGoBack}
+              data-testid="btn-prev-month"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <div className="text-center">
+              <div className="text-lg font-semibold">
+                {format(referenceDate, 'MMMM yyyy')}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {isCurrentMonth ? 'Current Month' : 'Historical View'}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {!isCurrentMonth && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={goToCurrentMonth}
+                  data-testid="btn-current-month"
+                >
+                  Today
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={goToNextMonth}
+                disabled={!canGoForward}
+                data-testid="btn-next-month"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+
           <div className="flex items-center gap-4">
             <StatusIcon className={`h-12 w-12 ${statusConfig[status].color}`} />
             <div className="flex-1">
@@ -93,15 +167,15 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
                 {statusConfig[status].label}
               </div>
               <div className="text-3xl font-bold mt-1">
-                £{rollingIncome.toLocaleString()} / £{VAT_THRESHOLD.toLocaleString()}
+                £{rollingIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / £{VAT_THRESHOLD.toLocaleString()}
               </div>
               <div className="text-sm text-muted-foreground mt-1">
-                Rolling 12-month taxable turnover
+                Rolling 12-month taxable turnover {!isCurrentMonth && `(as of ${format(referenceDate, 'MMM yyyy')})`}
               </div>
             </div>
             <div className="text-right">
               <div className="text-sm text-muted-foreground">Remaining</div>
-              <div className="text-2xl font-bold">£{remaining.toLocaleString()}</div>
+              <div className="text-2xl font-bold">£{remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
           </div>
           <div className="mt-4">
@@ -134,16 +208,16 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
                 <CardDescription>Income for {yearLabel}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">£{taxYearIncome.toLocaleString()}</div>
+                <div className="text-2xl font-bold">£{taxYearIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Rolling 12-Month</CardTitle>
-                <CardDescription>For VAT registration purposes</CardDescription>
+                <CardDescription>For VAT registration purposes {!isCurrentMonth && `(as of ${format(referenceDate, 'MMM yyyy')})`}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">£{rollingIncome.toLocaleString()}</div>
+                <div className="text-2xl font-bold">£{rollingIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               </CardContent>
             </Card>
           </div>
@@ -176,7 +250,7 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
           <Card>
             <CardHeader>
               <CardTitle>Monthly Income</CardTitle>
-              <CardDescription>Income over the last 12 months</CardDescription>
+              <CardDescription>Income over the 12 months ending {format(referenceDate, 'MMMM yyyy')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
@@ -192,7 +266,7 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
                   </ResponsiveContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
-                    No income data for the last 12 months
+                    No income data for this period
                   </div>
                 )}
               </div>
@@ -232,23 +306,23 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
           <Card>
             <CardHeader>
               <CardTitle>Monthly Income Breakdown</CardTitle>
-              <CardDescription>Used for rolling threshold calculation</CardDescription>
+              <CardDescription>12 months ending {format(referenceDate, 'MMMM yyyy')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {monthlyBreakdown.map((item) => (
                   <div key={item.month} className="flex items-center justify-between py-2 border-b last:border-b-0">
                     <span className="font-medium">{item.month}</span>
-                    <span>£{item.value.toLocaleString()}</span>
+                    <span>£{item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 ))}
                 {monthlyBreakdown.length === 0 && (
-                  <div className="text-muted-foreground text-center py-4">No income in the last 12 months</div>
+                  <div className="text-muted-foreground text-center py-4">No income in this period</div>
                 )}
                 {monthlyBreakdown.length > 0 && (
                   <div className="flex items-center justify-between py-3 border-t-2 font-bold text-lg mt-2">
                     <span>Total (Rolling 12 Months)</span>
-                    <span>£{rollingIncome.toLocaleString()}</span>
+                    <span>£{rollingIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
