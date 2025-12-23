@@ -10,10 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Building, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, Play, ListFilter, Pencil, Check, Upload, FileSpreadsheet, Trash2 } from "lucide-react";
+import { CheckCircle2, Building, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, Play, ListFilter, Pencil, Check, Upload, FileSpreadsheet, Trash2, Tag, X } from "lucide-react";
 import { useDataMode } from "@/lib/dataContext";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface CategorizationRule {
   id: string;
@@ -21,6 +22,15 @@ interface CategorizationRule {
   type: string;
   businessType: string | null;
   category: string | null;
+  createdAt: string;
+}
+
+interface Category {
+  id: string;
+  code: string;
+  label: string;
+  description: string | null;
+  type: string;
   createdAt: string;
 }
 
@@ -72,6 +82,28 @@ export default function Settings() {
     businessType: null as string | null,
     category: null as string | null,
   });
+
+  const [dbCategories, setDbCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState({
+    code: "",
+    label: "",
+    description: "",
+    type: "Expense" as string,
+  });
+  const [editCategory, setEditCategory] = useState({
+    code: "",
+    label: "",
+    description: "",
+    type: "Expense" as string,
+  });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; category: Category | null; transactionCount: number }>({
+    open: false,
+    category: null,
+    transactionCount: 0,
+  });
+  const [reassignTo, setReassignTo] = useState<string>("");
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -159,6 +191,7 @@ export default function Settings() {
 
   useEffect(() => {
     fetchRules();
+    fetchCategories();
   }, []);
 
   const fetchRules = async () => {
@@ -172,6 +205,137 @@ export default function Settings() {
       console.error("Error fetching rules:", error);
     } finally {
       setLoadingRules(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch("/api/categories");
+      if (response.ok) {
+        const data = await response.json();
+        setDbCategories(data);
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategory.code.trim() || !newCategory.label.trim()) {
+      toast({
+        title: "Code and Label Required",
+        description: "Please enter both a code and label for the category.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newCategory)
+      });
+
+      if (response.ok) {
+        const created = await response.json();
+        setDbCategories([...dbCategories, created]);
+        setNewCategory({ code: "", label: "", description: "", type: "Expense" });
+        toast({
+          title: "Category Created",
+          description: `Added "${created.label}" category.`,
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.error || "Failed to create category.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create category.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleStartEditCategory = (cat: Category) => {
+    setEditingCategoryId(cat.id);
+    setEditCategory({
+      code: cat.code,
+      label: cat.label,
+      description: cat.description || "",
+      type: cat.type,
+    });
+  };
+
+  const handleCancelEditCategory = () => {
+    setEditingCategoryId(null);
+    setEditCategory({ code: "", label: "", description: "", type: "Expense" });
+  };
+
+  const handleSaveEditCategory = async () => {
+    if (!editingCategoryId || !editCategory.code.trim() || !editCategory.label.trim()) {
+      toast({ title: "Code and Label Required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/categories/${editingCategoryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editCategory)
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        setDbCategories(dbCategories.map(c => c.id === editingCategoryId ? updated : c));
+        setEditingCategoryId(null);
+        setEditCategory({ code: "", label: "", description: "", type: "Expense" });
+        toast({ title: "Category Updated" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update category.", variant: "destructive" });
+    }
+  };
+
+  const handlePrepareDeleteCategory = async (cat: Category) => {
+    try {
+      const response = await fetch(`/api/categories/${cat.id}/count`);
+      const data = await response.json();
+      setDeleteDialog({ open: true, category: cat, transactionCount: data.count || 0 });
+      setReassignTo("");
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to check category usage.", variant: "destructive" });
+    }
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!deleteDialog.category) return;
+
+    const cat = deleteDialog.category;
+    const reassignParam = deleteDialog.transactionCount > 0 && reassignTo ? `?reassignTo=${encodeURIComponent(reassignTo)}` : "";
+    
+    try {
+      const response = await fetch(`/api/categories/${cat.id}${reassignParam}`, { method: "DELETE" });
+      const data = await response.json();
+      
+      if (response.ok) {
+        setDbCategories(dbCategories.filter(c => c.id !== cat.id));
+        setDeleteDialog({ open: false, category: null, transactionCount: 0 });
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+        toast({ 
+          title: "Category Deleted",
+          description: data.reassigned > 0 ? `Reassigned ${data.reassigned} transactions.` : undefined
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete category.", variant: "destructive" });
     }
   };
 
@@ -416,6 +580,7 @@ export default function Settings() {
         <Tabs value={currentSection} onValueChange={handleTabChange} className="w-full">
           <TabsList data-testid="tabs-settings">
             <TabsTrigger value="rules" data-testid="tab-rules">Rules</TabsTrigger>
+            <TabsTrigger value="categories" data-testid="tab-categories">Categories</TabsTrigger>
             <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
             <TabsTrigger value="preferences" data-testid="tab-preferences">Preferences</TabsTrigger>
           </TabsList>
@@ -652,6 +817,265 @@ export default function Settings() {
                                   onClick={() => handleDeleteRule(rule.id)}
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                   data-testid={`button-delete-rule-${rule.id}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="categories" className="mt-6 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-green-600" />
+                  <CardTitle>Expense & Income Categories</CardTitle>
+                </div>
+                <CardDescription>
+                  Manage your HMRC SA103F expense categories and income categories. Categories are used for tax reporting and expense tracking.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4 border rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                  <h4 className="font-medium text-sm">Add New Category</h4>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cat-code">Code</Label>
+                      <Input
+                        id="cat-code"
+                        placeholder="e.g. C12"
+                        value={newCategory.code}
+                        onChange={(e) => setNewCategory({ ...newCategory, code: e.target.value })}
+                        data-testid="input-category-code"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cat-label">Label</Label>
+                      <Input
+                        id="cat-label"
+                        placeholder="e.g. Equipment"
+                        value={newCategory.label}
+                        onChange={(e) => setNewCategory({ ...newCategory, label: e.target.value })}
+                        data-testid="input-category-label"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Type</Label>
+                      <Select
+                        value={newCategory.type}
+                        onValueChange={(value) => setNewCategory({ ...newCategory, type: value })}
+                      >
+                        <SelectTrigger data-testid="select-category-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Expense">Expense</SelectItem>
+                          <SelectItem value="Income">Income</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cat-desc">Description</Label>
+                      <Input
+                        id="cat-desc"
+                        placeholder="Optional description"
+                        value={newCategory.description}
+                        onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                        data-testid="input-category-description"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleAddCategory} className="mt-2" data-testid="button-add-category">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Category
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm">Expense Categories ({dbCategories.filter(c => c.type === 'Expense').length})</h4>
+                  {loadingCategories ? (
+                    <p className="text-sm text-muted-foreground">Loading categories...</p>
+                  ) : dbCategories.filter(c => c.type === 'Expense').length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No expense categories found.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {dbCategories.filter(c => c.type === 'Expense').map((cat) => (
+                        <div 
+                          key={cat.id} 
+                          className="p-3 border rounded-md bg-white dark:bg-slate-950"
+                          data-testid={`category-item-${cat.id}`}
+                        >
+                          {editingCategoryId === cat.id ? (
+                            <div className="space-y-3">
+                              <div className="grid gap-3 md:grid-cols-4">
+                                <Input
+                                  value={editCategory.code}
+                                  onChange={(e) => setEditCategory({ ...editCategory, code: e.target.value })}
+                                  placeholder="Code"
+                                  data-testid={`input-edit-cat-code-${cat.id}`}
+                                />
+                                <Input
+                                  value={editCategory.label}
+                                  onChange={(e) => setEditCategory({ ...editCategory, label: e.target.value })}
+                                  placeholder="Label"
+                                  data-testid={`input-edit-cat-label-${cat.id}`}
+                                />
+                                <Select
+                                  value={editCategory.type}
+                                  onValueChange={(value) => setEditCategory({ ...editCategory, type: value })}
+                                >
+                                  <SelectTrigger data-testid={`select-edit-cat-type-${cat.id}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Expense">Expense</SelectItem>
+                                    <SelectItem value="Income">Income</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  value={editCategory.description}
+                                  onChange={(e) => setEditCategory({ ...editCategory, description: e.target.value })}
+                                  placeholder="Description"
+                                  data-testid={`input-edit-cat-desc-${cat.id}`}
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={handleSaveEditCategory} data-testid={`button-save-category-${cat.id}`}>
+                                  <Check className="mr-1 h-3 w-3" />
+                                  Save
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={handleCancelEditCategory} data-testid={`button-cancel-edit-category-${cat.id}`}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 text-sm">
+                                <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded w-12 text-center">
+                                  {cat.code}
+                                </span>
+                                <span className="font-medium">{cat.label}</span>
+                                {cat.description && (
+                                  <span className="text-muted-foreground text-xs hidden md:inline">- {cat.description}</span>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleStartEditCategory(cat)}
+                                  data-testid={`button-edit-category-${cat.id}`}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handlePrepareDeleteCategory(cat)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  data-testid={`button-delete-category-${cat.id}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm">Income Categories ({dbCategories.filter(c => c.type === 'Income').length})</h4>
+                  {dbCategories.filter(c => c.type === 'Income').length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No income categories found.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {dbCategories.filter(c => c.type === 'Income').map((cat) => (
+                        <div 
+                          key={cat.id} 
+                          className="p-3 border rounded-md bg-white dark:bg-slate-950"
+                          data-testid={`category-item-${cat.id}`}
+                        >
+                          {editingCategoryId === cat.id ? (
+                            <div className="space-y-3">
+                              <div className="grid gap-3 md:grid-cols-4">
+                                <Input
+                                  value={editCategory.code}
+                                  onChange={(e) => setEditCategory({ ...editCategory, code: e.target.value })}
+                                  placeholder="Code"
+                                />
+                                <Input
+                                  value={editCategory.label}
+                                  onChange={(e) => setEditCategory({ ...editCategory, label: e.target.value })}
+                                  placeholder="Label"
+                                />
+                                <Select
+                                  value={editCategory.type}
+                                  onValueChange={(value) => setEditCategory({ ...editCategory, type: value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Expense">Expense</SelectItem>
+                                    <SelectItem value="Income">Income</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  value={editCategory.description}
+                                  onChange={(e) => setEditCategory({ ...editCategory, description: e.target.value })}
+                                  placeholder="Description"
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={handleSaveEditCategory}>
+                                  <Check className="mr-1 h-3 w-3" />
+                                  Save
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={handleCancelEditCategory}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 text-sm">
+                                <span className="font-mono text-xs bg-green-100 dark:bg-green-800 px-2 py-1 rounded w-12 text-center">
+                                  {cat.code}
+                                </span>
+                                <span className="font-medium">{cat.label}</span>
+                                {cat.description && (
+                                  <span className="text-muted-foreground text-xs hidden md:inline">- {cat.description}</span>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleStartEditCategory(cat)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handlePrepareDeleteCategory(cat)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -1017,6 +1441,57 @@ export default function Settings() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, category: null, transactionCount: 0 })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Category</DialogTitle>
+            <DialogDescription>
+              {deleteDialog.transactionCount > 0 ? (
+                <>
+                  The category "<strong>{deleteDialog.category?.label}</strong>" is used by <strong>{deleteDialog.transactionCount}</strong> transaction{deleteDialog.transactionCount > 1 ? 's' : ''}.
+                  Please select a category to reassign these transactions to before deleting.
+                </>
+              ) : (
+                <>Are you sure you want to delete the category "<strong>{deleteDialog.category?.label}</strong>"?</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {deleteDialog.transactionCount > 0 && (
+            <div className="space-y-2 py-4">
+              <Label>Reassign transactions to:</Label>
+              <Select value={reassignTo} onValueChange={setReassignTo}>
+                <SelectTrigger data-testid="select-reassign-category">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dbCategories
+                    .filter(c => c.id !== deleteDialog.category?.id && c.type === deleteDialog.category?.type)
+                    .map(c => (
+                      <SelectItem key={c.id} value={c.label}>{c.label}</SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog({ open: false, category: null, transactionCount: 0 })} data-testid="button-cancel-delete">
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmDeleteCategory}
+              disabled={deleteDialog.transactionCount > 0 && !reassignTo}
+              data-testid="button-confirm-delete"
+            >
+              {deleteDialog.transactionCount > 0 ? 'Reassign & Delete' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
