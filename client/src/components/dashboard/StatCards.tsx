@@ -82,18 +82,96 @@ const formatDateLabel = (label: string) => {
     .join(' ');
 };
 
+interface AnimatedPanelProps {
+  isActive: boolean;
+  children: React.ReactNode;
+  className?: string;
+}
+
+function AnimatedPanel({ isActive, children, className }: AnimatedPanelProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | 'auto'>(0);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+
+    if (isActive && !shouldRender) {
+      setShouldRender(true);
+      flushSync(() => setHeight(0));
+      void container.offsetHeight;
+      requestAnimationFrame(() => {
+        const targetHeight = content.scrollHeight;
+        setHeight(targetHeight);
+      });
+    } else if (!isActive && shouldRender) {
+      const currentHeight = container.getBoundingClientRect().height;
+      flushSync(() => setHeight(currentHeight));
+      void container.offsetHeight;
+      requestAnimationFrame(() => {
+        setHeight(0);
+      });
+    }
+  }, [isActive, shouldRender]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleTransitionEnd = (e: TransitionEvent) => {
+      if (e.propertyName !== 'height') return;
+      if (isActive) {
+        setHeight('auto');
+      } else {
+        setShouldRender(false);
+      }
+    };
+
+    container.addEventListener('transitionend', handleTransitionEnd);
+    return () => container.removeEventListener('transitionend', handleTransitionEnd);
+  }, [isActive]);
+
+  if (!shouldRender && !isActive) return null;
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn("overflow-hidden transition-[height] duration-300 ease-in-out", className)}
+      style={{ height: typeof height === 'number' ? `${height}px` : height }}
+    >
+      <div ref={contentRef}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia(query).matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+    const handler = (event: MediaQueryListEvent) => setMatches(event.matches);
+    
+    setMatches(mediaQuery.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, [query]);
+
+  return matches;
+}
+
 export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const [activeTab, setActiveTab] = useState<TabType>(null);
-  const [displayedTab, setDisplayedTab] = useState<TabType>(null);
-  const [animationPhase, setAnimationPhase] = useState<'idle' | 'collapsing' | 'expanding'>('idle');
-  const [containerHeight, setContainerHeight] = useState<number | 'auto'>(0);
-  const [pendingTab, setPendingTab] = useState<TabType>(null);
-  
-  const profitRef = useRef<HTMLDivElement>(null);
-  const incomeRef = useRef<HTMLDivElement>(null);
-  const expensesRef = useRef<HTMLDivElement>(null);
-  const taxRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   
   const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income');
   const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense');
@@ -106,108 +184,9 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   
   const formatCurrency = (value: number) => `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const getContentRef = useCallback((tab: TabType) => {
-    switch (tab) {
-      case 'profit': return profitRef;
-      case 'income': return incomeRef;
-      case 'expenses': return expensesRef;
-      case 'tax': return taxRef;
-      default: return null;
-    }
-  }, []);
-
-  const measureHeight = useCallback((tab: TabType): number => {
-    const ref = getContentRef(tab);
-    if (ref?.current) {
-      return ref.current.scrollHeight;
-    }
-    return 0;
-  }, [getContentRef]);
-
   const toggleTab = useCallback((tab: TabType) => {
-    if (animationPhase !== 'idle') return;
-    const container = containerRef.current;
-
-    if (activeTab === tab) {
-      // Closing the current tab - animate height from current to 0
-      const currentHeight = container?.getBoundingClientRect().height || measureHeight(displayedTab);
-      flushSync(() => {
-        setContainerHeight(currentHeight);
-        setAnimationPhase('collapsing');
-        setPendingTab(null);
-      });
-      void container?.offsetHeight; // Force reflow
-      requestAnimationFrame(() => {
-        setContainerHeight(0);
-      });
-    } else if (activeTab === null) {
-      // Opening a new tab from closed state - animate height from 0 to target
-      flushSync(() => {
-        setActiveTab(tab);
-        setDisplayedTab(tab);
-        setAnimationPhase('expanding');
-        setContainerHeight(0);
-      });
-      void container?.offsetHeight; // Force reflow
-      requestAnimationFrame(() => {
-        const newHeight = measureHeight(tab);
-        setContainerHeight(newHeight);
-      });
-    } else {
-      // Switching from one tab to another - collapse first, then expand
-      const currentHeight = container?.getBoundingClientRect().height || measureHeight(displayedTab);
-      flushSync(() => {
-        setContainerHeight(currentHeight);
-        setPendingTab(tab);
-        setAnimationPhase('collapsing');
-      });
-      void container?.offsetHeight; // Force reflow
-      requestAnimationFrame(() => {
-        setContainerHeight(0);
-      });
-    }
-  }, [activeTab, animationPhase, displayedTab, measureHeight]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleTransitionEnd = (e: TransitionEvent) => {
-      if (e.propertyName !== 'height') return;
-
-      if (animationPhase === 'collapsing') {
-        if (pendingTab) {
-          // Switching tabs - now expand to the new tab
-          // Use flushSync to ensure DOM is updated before measuring
-          const tabToExpand = pendingTab;
-          flushSync(() => {
-            setActiveTab(tabToExpand);
-            setDisplayedTab(tabToExpand);
-            setAnimationPhase('expanding');
-            setPendingTab(null);
-            setContainerHeight(0);
-          });
-          void container.offsetHeight; // Force reflow
-          requestAnimationFrame(() => {
-            const newHeight = measureHeight(tabToExpand);
-            setContainerHeight(newHeight);
-          });
-        } else {
-          // Closing completely
-          setActiveTab(null);
-          setDisplayedTab(null);
-          setAnimationPhase('idle');
-        }
-      } else if (animationPhase === 'expanding') {
-        // Expansion complete - release to auto for natural sizing
-        setContainerHeight('auto');
-        setAnimationPhase('idle');
-      }
-    };
-
-    container.addEventListener('transitionend', handleTransitionEnd);
-    return () => container.removeEventListener('transitionend', handleTransitionEnd);
-  }, [animationPhase, pendingTab, measureHeight]);
+    setActiveTab(prev => prev === tab ? null : tab);
+  }, []);
 
   const expensesByCategory = expenseTransactions.reduce((acc, t) => {
     const category = t.category || 'Uncategorized';
@@ -219,343 +198,459 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6);
 
-  const getCardClasses = (tab: TabType, baseColor: string, borderColor: string) => {
+  const getCardClasses = (tab: TabType, baseColor: string, borderColor: string, roundedClass?: string) => {
     const isActive = activeTab === tab;
     return cn(
       "cursor-pointer transition-all",
       isActive
-        ? `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} rounded-b-none ${baseColor} -mb-[18px] relative z-10`
+        ? `border-2 ${borderColor} ${baseColor} rounded-b-none ${roundedClass || ''}`
         : "border border-slate-200 dark:border-slate-800"
     );
   };
 
-  const isContentVisible = (tab: TabType) => {
-    return displayedTab === tab;
+  const ProfitContent = () => (
+    <Card className="border-2 border-t-0 border-blue-500 dark:border-blue-500 rounded-t-none rounded-b-xl bg-blue-50 dark:bg-blue-950">
+      <CardContent className="pt-4">
+        <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Calculation</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Total Income</span>
+                <span className="font-medium text-emerald-600">{formatCurrency(businessIncome)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Total Expenses</span>
+                <span className="font-medium text-red-500">-{formatCurrency(businessExpense)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t pt-2">
+                <span>Net Profit</span>
+                <span className="text-blue-600">{formatCurrency(profit)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Margins</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Profit Margin</span>
+                <span className="font-medium">{businessIncome > 0 ? ((profit / businessIncome) * 100).toFixed(1) : 0}%</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Expense Ratio</span>
+                <span className="font-medium">{businessIncome > 0 ? ((businessExpense / businessIncome) * 100).toFixed(1) : 0}%</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">After Tax</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Gross Profit</span>
+                <span className="font-medium">{formatCurrency(profit)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Est. Tax</span>
+                <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t pt-2">
+                <span>Take Home</span>
+                <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const IncomeContent = () => (
+    <Card className="border-2 border-t-0 border-emerald-500 dark:border-emerald-500 rounded-t-none rounded-b-xl bg-emerald-50 dark:bg-emerald-950">
+      <CardContent className="pt-4">
+        <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Total Transactions</span>
+                <span className="font-medium">{incomeTransactions.length}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Average Value</span>
+                <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? businessIncome / incomeTransactions.length : 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t pt-2">
+                <span>Total Income</span>
+                <span className="text-emerald-600">{formatCurrency(businessIncome)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Transactions</h4>
+            <div className="space-y-2">
+              {incomeTransactions
+                .sort((a, b) => b.amount - a.amount)
+                .slice(0, 3)
+                .map((t, i) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="truncate max-w-[150px]">{t.description}</span>
+                    <span className="font-medium">{formatCurrency(t.amount)}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Value Range</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Smallest</span>
+                <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.min(...incomeTransactions.map(t => t.amount)) : 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Largest</span>
+                <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.max(...incomeTransactions.map(t => t.amount)) : 0)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const ExpensesContent = () => (
+    <Card className="border-2 border-t-0 border-red-500 dark:border-red-500 rounded-t-none rounded-b-xl bg-red-50 dark:bg-red-950">
+      <CardContent className="pt-4">
+        <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Categories</h4>
+            <div className="space-y-2">
+              {sortedExpenseCategories.slice(0, 4).map(([category, amount], i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="truncate max-w-[150px]">{category}</span>
+                  <span className="font-medium">{formatCurrency(amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Total Transactions</span>
+                <span className="font-medium">{expenseTransactions.length}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Average Value</span>
+                <span className="font-medium">{formatCurrency(expenseTransactions.length > 0 ? businessExpense / expenseTransactions.length : 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Categories Used</span>
+                <span className="font-medium">{Object.keys(expensesByCategory).length}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Expenses</h4>
+            <div className="space-y-2">
+              {expenseTransactions
+                .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+                .slice(0, 3)
+                .map((t, i) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="truncate max-w-[150px]">{t.description}</span>
+                    <span className="font-medium text-red-500">{formatCurrency(Math.abs(t.amount))}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const TaxContent = () => (
+    <Card className="border-2 border-t-0 border-amber-500 dark:border-amber-500 rounded-t-none rounded-b-xl bg-amber-50 dark:bg-amber-950">
+      <CardContent className="pt-4">
+        <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tax Components</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Income Tax</span>
+                <span className="font-medium">{formatCurrency(taxBreakdown.incomeTax)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Class 4 NI</span>
+                <span className="font-medium">{formatCurrency(taxBreakdown.class4NI)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Class 2 NI</span>
+                <span className="font-medium">{formatCurrency(taxBreakdown.class2NI)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t pt-2">
+                <span>Total Tax Due</span>
+                <span className="text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Income Tax Bands</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Personal Allowance</span>
+                <span className="font-medium text-green-600">{formatCurrency(taxBreakdown.personalAllowance)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Basic Rate (20%)</span>
+                <span className="font-medium">{formatCurrency(taxBreakdown.basicRateTax)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Higher Rate (40%)</span>
+                <span className="font-medium">{formatCurrency(taxBreakdown.higherRateTax)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Take Home</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Gross Profit</span>
+                <span className="font-medium">{formatCurrency(profit)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Less Tax</span>
+                <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t pt-2">
+                <span>Net Income</span>
+                <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderContent = (tab: TabType) => {
+    switch (tab) {
+      case 'profit': return <ProfitContent />;
+      case 'income': return <IncomeContent />;
+      case 'expenses': return <ExpensesContent />;
+      case 'tax': return <TaxContent />;
+      default: return null;
+    }
   };
 
-  return (
-    <div className="space-y-0">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pb-4">
-        <Card 
-          className={getCardClasses('profit', 'bg-blue-50 dark:bg-blue-950', 'border-blue-500 dark:border-blue-500')}
-          onClick={() => toggleTab('profit')}
-          data-testid="card-profit"
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Business Profit</CardTitle>
-            {activeTab === 'profit' ? (
-              <ChevronUp className="h-4 w-4 text-blue-500" />
-            ) : (
-              <Wallet className="h-4 w-4 text-blue-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(profit)}</div>
-            <p className="text-xs text-muted-foreground">
-              {formatDateLabel(dateLabel)}
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card 
-          className={getCardClasses('income', 'bg-emerald-50 dark:bg-emerald-950', 'border-emerald-500 dark:border-emerald-500')}
-          onClick={() => toggleTab('income')}
-          data-testid="card-income"
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Business Income</CardTitle>
-            {activeTab === 'income' ? (
-              <ChevronUp className="h-4 w-4 text-emerald-500" />
-            ) : (
-              <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{formatCurrency(businessIncome)}</div>
-            <p className="text-xs text-muted-foreground">
-              Gross Revenue
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card 
-          className={getCardClasses('expenses', 'bg-red-50 dark:bg-red-950', 'border-red-500 dark:border-red-500')}
-          onClick={() => toggleTab('expenses')}
-          data-testid="card-expenses"
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Business Expenses</CardTitle>
-            {activeTab === 'expenses' ? (
-              <ChevronUp className="h-4 w-4 text-red-500" />
-            ) : (
-              <ArrowDownRight className="h-4 w-4 text-red-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{formatCurrency(businessExpense)}</div>
-            <p className="text-xs text-muted-foreground">
-              Deductibles
-            </p>
-          </CardContent>
-        </Card>
+  if (isDesktop) {
+    return (
+      <div className="space-y-0">
+        <div className="grid gap-4 grid-cols-4 pb-4">
+          <Card 
+            className={getCardClasses('profit', 'bg-blue-50 dark:bg-blue-950', 'border-blue-500 dark:border-blue-500')}
+            onClick={() => toggleTab('profit')}
+            data-testid="card-profit"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Business Profit</CardTitle>
+              {activeTab === 'profit' ? (
+                <ChevronUp className="h-4 w-4 text-blue-500" />
+              ) : (
+                <Wallet className="h-4 w-4 text-blue-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(profit)}</div>
+              <p className="text-xs text-muted-foreground">
+                {formatDateLabel(dateLabel)}
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className={getCardClasses('income', 'bg-emerald-50 dark:bg-emerald-950', 'border-emerald-500 dark:border-emerald-500')}
+            onClick={() => toggleTab('income')}
+            data-testid="card-income"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Business Income</CardTitle>
+              {activeTab === 'income' ? (
+                <ChevronUp className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">{formatCurrency(businessIncome)}</div>
+              <p className="text-xs text-muted-foreground">
+                Gross Revenue
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className={getCardClasses('expenses', 'bg-red-50 dark:bg-red-950', 'border-red-500 dark:border-red-500')}
+            onClick={() => toggleTab('expenses')}
+            data-testid="card-expenses"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Business Expenses</CardTitle>
+              {activeTab === 'expenses' ? (
+                <ChevronUp className="h-4 w-4 text-red-500" />
+              ) : (
+                <ArrowDownRight className="h-4 w-4 text-red-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(businessExpense)}</div>
+              <p className="text-xs text-muted-foreground">
+                Deductibles
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card 
-          className={getCardClasses('tax', 'bg-amber-50 dark:bg-amber-950', 'border-amber-500 dark:border-amber-500')}
-          onClick={() => toggleTab('tax')}
-          data-testid="card-tax-owed"
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Est. Tax Owed</CardTitle>
-            {activeTab === 'tax' ? (
-              <ChevronUp className="h-4 w-4 text-amber-500" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-amber-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</div>
-            <p className="text-xs text-muted-foreground">
-              {taxBreakdown.effectiveRate.toFixed(1)}% effective rate
-            </p>
-          </CardContent>
-        </Card>
+          <Card 
+            className={getCardClasses('tax', 'bg-amber-50 dark:bg-amber-950', 'border-amber-500 dark:border-amber-500')}
+            onClick={() => toggleTab('tax')}
+            data-testid="card-tax-owed"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Est. Tax Owed</CardTitle>
+              {activeTab === 'tax' ? (
+                <ChevronUp className="h-4 w-4 text-amber-500" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-amber-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</div>
+              <p className="text-xs text-muted-foreground">
+                {taxBreakdown.effectiveRate.toFixed(1)}% effective rate
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <AnimatedPanel isActive={activeTab !== null} className="-mt-4">
+          {renderContent(activeTab)}
+        </AnimatedPanel>
       </div>
-      
-      <div 
-        ref={containerRef}
-        className="overflow-hidden transition-[height] duration-300 ease-in-out"
-        style={{ height: containerHeight }}
-      >
-          <div ref={profitRef} className={cn(!isContentVisible('profit') && 'hidden')}>
-          <Card className="border-2 border-blue-500 dark:border-blue-500 rounded-tl-none rounded-tr-xl rounded-b-xl bg-blue-50 dark:bg-blue-950">
-            <CardContent className="pt-4">
-              <div className="grid gap-12 md:grid-cols-3">
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Calculation</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Total Income</span>
-                      <span className="font-medium text-emerald-600">{formatCurrency(businessIncome)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Total Expenses</span>
-                      <span className="font-medium text-red-500">-{formatCurrency(businessExpense)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold border-t pt-2">
-                      <span>Net Profit</span>
-                      <span className="text-blue-600">{formatCurrency(profit)}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Margins</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Profit Margin</span>
-                      <span className="font-medium">{businessIncome > 0 ? ((profit / businessIncome) * 100).toFixed(1) : 0}%</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Expense Ratio</span>
-                      <span className="font-medium">{businessIncome > 0 ? ((businessExpense / businessIncome) * 100).toFixed(1) : 0}%</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">After Tax</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Gross Profit</span>
-                      <span className="font-medium">{formatCurrency(profit)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Est. Tax</span>
-                      <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold border-t pt-2">
-                      <span>Take Home</span>
-                      <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-4">
+        <div>
+          <Card 
+            className={getCardClasses('profit', 'bg-blue-50 dark:bg-blue-950', 'border-blue-500 dark:border-blue-500')}
+            onClick={() => toggleTab('profit')}
+            data-testid="card-profit"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Business Profit</CardTitle>
+              {activeTab === 'profit' ? (
+                <ChevronUp className="h-4 w-4 text-blue-500" />
+              ) : (
+                <Wallet className="h-4 w-4 text-blue-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(profit)}</div>
+              <p className="text-xs text-muted-foreground">
+                {formatDateLabel(dateLabel)}
+              </p>
             </CardContent>
           </Card>
+          <AnimatedPanel isActive={activeTab === 'profit'}>
+            <ProfitContent />
+          </AnimatedPanel>
+        </div>
+        
+        <div>
+          <Card 
+            className={getCardClasses('income', 'bg-emerald-50 dark:bg-emerald-950', 'border-emerald-500 dark:border-emerald-500')}
+            onClick={() => toggleTab('income')}
+            data-testid="card-income"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Business Income</CardTitle>
+              {activeTab === 'income' ? (
+                <ChevronUp className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">{formatCurrency(businessIncome)}</div>
+              <p className="text-xs text-muted-foreground">
+                Gross Revenue
+              </p>
+            </CardContent>
+          </Card>
+          <AnimatedPanel isActive={activeTab === 'income'}>
+            <IncomeContent />
+          </AnimatedPanel>
+        </div>
+        
+        <div>
+          <Card 
+            className={getCardClasses('expenses', 'bg-red-50 dark:bg-red-950', 'border-red-500 dark:border-red-500')}
+            onClick={() => toggleTab('expenses')}
+            data-testid="card-expenses"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Business Expenses</CardTitle>
+              {activeTab === 'expenses' ? (
+                <ChevronUp className="h-4 w-4 text-red-500" />
+              ) : (
+                <ArrowDownRight className="h-4 w-4 text-red-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(businessExpense)}</div>
+              <p className="text-xs text-muted-foreground">
+                Deductibles
+              </p>
+            </CardContent>
+          </Card>
+          <AnimatedPanel isActive={activeTab === 'expenses'}>
+            <ExpensesContent />
+          </AnimatedPanel>
         </div>
 
-        <div ref={incomeRef} className={cn(!isContentVisible('income') && 'hidden')}>
-          <Card className="border-2 border-emerald-500 dark:border-emerald-500 rounded-xl bg-emerald-50 dark:bg-emerald-950">
-            <CardContent className="pt-4">
-              <div className="grid gap-12 md:grid-cols-3">
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Total Transactions</span>
-                      <span className="font-medium">{incomeTransactions.length}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Average Value</span>
-                      <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? businessIncome / incomeTransactions.length : 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold border-t pt-2">
-                      <span>Total Income</span>
-                      <span className="text-emerald-600">{formatCurrency(businessIncome)}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Transactions</h4>
-                  <div className="space-y-2">
-                    {incomeTransactions
-                      .sort((a, b) => b.amount - a.amount)
-                      .slice(0, 3)
-                      .map((t, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <span className="truncate max-w-[150px]">{t.description}</span>
-                          <span className="font-medium">{formatCurrency(t.amount)}</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Value Range</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Smallest</span>
-                      <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.min(...incomeTransactions.map(t => t.amount)) : 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Largest</span>
-                      <span className="font-medium">{formatCurrency(incomeTransactions.length > 0 ? Math.max(...incomeTransactions.map(t => t.amount)) : 0)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <div>
+          <Card 
+            className={getCardClasses('tax', 'bg-amber-50 dark:bg-amber-950', 'border-amber-500 dark:border-amber-500')}
+            onClick={() => toggleTab('tax')}
+            data-testid="card-tax-owed"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Est. Tax Owed</CardTitle>
+              {activeTab === 'tax' ? (
+                <ChevronUp className="h-4 w-4 text-amber-500" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-amber-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</div>
+              <p className="text-xs text-muted-foreground">
+                {taxBreakdown.effectiveRate.toFixed(1)}% effective rate
+              </p>
             </CardContent>
           </Card>
-        </div>
-
-        <div ref={expensesRef} className={cn(!isContentVisible('expenses') && 'hidden')}>
-          <Card className="border-2 border-red-500 dark:border-red-500 rounded-xl bg-red-50 dark:bg-red-950">
-            <CardContent className="pt-4">
-              <div className="grid gap-12 md:grid-cols-3">
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Categories</h4>
-                  <div className="space-y-2">
-                    {sortedExpenseCategories.slice(0, 4).map(([category, amount], i) => (
-                      <div key={i} className="flex justify-between text-sm">
-                        <span className="truncate max-w-[150px]">{category}</span>
-                        <span className="font-medium">{formatCurrency(amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Summary</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Total Transactions</span>
-                      <span className="font-medium">{expenseTransactions.length}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Average Value</span>
-                      <span className="font-medium">{formatCurrency(expenseTransactions.length > 0 ? businessExpense / expenseTransactions.length : 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Categories Used</span>
-                      <span className="font-medium">{Object.keys(expensesByCategory).length}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Largest Expenses</h4>
-                  <div className="space-y-2">
-                    {expenseTransactions
-                      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
-                      .slice(0, 3)
-                      .map((t, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <span className="truncate max-w-[150px]">{t.description}</span>
-                          <span className="font-medium text-red-500">{formatCurrency(Math.abs(t.amount))}</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div ref={taxRef} className={cn(!isContentVisible('tax') && 'hidden')}>
-          <Card className="border-2 border-amber-500 dark:border-amber-500 rounded-tr-none rounded-tl-xl rounded-b-xl bg-amber-50 dark:bg-amber-950">
-            <CardContent className="pt-4">
-              <div className="grid gap-12 md:grid-cols-3">
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tax Components</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Income Tax</span>
-                      <span className="font-medium">{formatCurrency(taxBreakdown.incomeTax)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Class 4 NI</span>
-                      <span className="font-medium">{formatCurrency(taxBreakdown.class4NI)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Class 2 NI</span>
-                      <span className="font-medium">{formatCurrency(taxBreakdown.class2NI)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold border-t pt-2">
-                      <span>Total Tax Due</span>
-                      <span className="text-amber-600">{formatCurrency(taxBreakdown.totalTax)}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Income Tax Bands</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Personal Allowance</span>
-                      <span className="font-medium text-green-600">{formatCurrency(taxBreakdown.personalAllowance)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Basic Rate (20%)</span>
-                      <span className="font-medium">{formatCurrency(taxBreakdown.basicRateTax)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Higher Rate (40%)</span>
-                      <span className="font-medium">{formatCurrency(taxBreakdown.higherRateTax)}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Take Home</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Gross Profit</span>
-                      <span className="font-medium">{formatCurrency(profit)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Less Tax</span>
-                      <span className="font-medium text-red-500">-{formatCurrency(taxBreakdown.totalTax)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold border-t pt-2">
-                      <span>Net Income</span>
-                      <span className="text-green-600">{formatCurrency(profit - taxBreakdown.totalTax)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <AnimatedPanel isActive={activeTab === 'tax'}>
+            <TaxContent />
+          </AnimatedPanel>
         </div>
       </div>
     </div>
