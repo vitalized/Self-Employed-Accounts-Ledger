@@ -234,8 +234,17 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     );
   };
 
+  const getContentPanelRounding = (tab: TabType) => {
+    if (!isDesktop) return "rounded-xl";
+    switch (tab) {
+      case 'profit': return "rounded-tr-xl rounded-b-xl";
+      case 'tax': return "rounded-tl-xl rounded-b-xl";
+      default: return "rounded-xl";
+    }
+  };
+
   const ProfitContent = () => (
-    <Card className="border-2 border-blue-500 dark:border-blue-500 rounded-xl bg-blue-50 dark:bg-blue-950">
+    <Card className={cn("border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-950", getContentPanelRounding('profit'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -293,7 +302,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const IncomeContent = () => (
-    <Card className="border-2 border-emerald-500 dark:border-emerald-500 rounded-xl bg-emerald-50 dark:bg-emerald-950">
+    <Card className={cn("border-2 border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950", getContentPanelRounding('income'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -348,7 +357,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const ExpensesContent = () => (
-    <Card className="border-2 border-red-500 dark:border-red-500 rounded-xl bg-red-50 dark:bg-red-950">
+    <Card className={cn("border-2 border-red-500 dark:border-red-500 bg-red-50 dark:bg-red-950", getContentPanelRounding('expenses'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -401,7 +410,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const TaxContent = () => (
-    <Card className="border-2 border-amber-500 dark:border-amber-500 rounded-xl bg-amber-50 dark:bg-amber-950">
+    <Card className={cn("border-2 border-amber-500 dark:border-amber-500 bg-amber-50 dark:bg-amber-950", getContentPanelRounding('tax'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
