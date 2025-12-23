@@ -86,35 +86,25 @@ interface AnimatedPanelProps {
   children: React.ReactNode;
   className?: string;
   contentKey?: string | null;
+  onCollapseEnd?: () => void;
 }
 
-function AnimatedPanel({ isActive, children, className, contentKey }: AnimatedPanelProps) {
+function AnimatedPanel({ isActive, children, className, contentKey, onCollapseEnd }: AnimatedPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>(0);
   const [shouldRender, setShouldRender] = useState(false);
-  const prevContentKeyRef = useRef<string | null | undefined>(contentKey);
+  const onCollapseEndRef = useRef(onCollapseEnd);
+  onCollapseEndRef.current = onCollapseEnd;
 
   useEffect(() => {
     const container = containerRef.current;
     const content = contentRef.current;
     if (!container || !content) return;
 
-    const contentChanged = isActive && prevContentKeyRef.current !== contentKey && shouldRender;
-    prevContentKeyRef.current = contentKey;
-
     if (isActive && !shouldRender) {
       setShouldRender(true);
       setHeight(0);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const targetHeight = content.scrollHeight;
-          setHeight(targetHeight);
-        });
-      });
-    } else if (contentChanged) {
-      const currentHeight = container.getBoundingClientRect().height;
-      setHeight(currentHeight);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const targetHeight = content.scrollHeight;
@@ -130,7 +120,7 @@ function AnimatedPanel({ isActive, children, className, contentKey }: AnimatedPa
         });
       });
     }
-  }, [isActive, shouldRender, contentKey]);
+  }, [isActive, shouldRender]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -142,6 +132,7 @@ function AnimatedPanel({ isActive, children, className, contentKey }: AnimatedPa
         setHeight('auto');
       } else {
         setShouldRender(false);
+        onCollapseEndRef.current?.();
       }
     };
 
@@ -186,7 +177,16 @@ function useMediaQuery(query: string): boolean {
 
 export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const [activeTab, setActiveTab] = useState<TabType>(null);
+  const [pendingTab, setPendingTab] = useState<TabType>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [displayedTab, setDisplayedTab] = useState<TabType>(null);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  
+  useEffect(() => {
+    if (activeTab !== null) {
+      setDisplayedTab(activeTab);
+    }
+  }, [activeTab]);
   
   const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income');
   const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense');
@@ -199,9 +199,27 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   
   const formatCurrency = (value: number) => `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const handleCollapseEnd = useCallback(() => {
+    if (pendingTab !== null) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    } else {
+      setDisplayedTab(null);
+    }
+    setIsClosing(false);
+  }, [pendingTab]);
+
   const toggleTab = useCallback((tab: TabType) => {
-    setActiveTab(prev => prev === tab ? null : tab);
-  }, []);
+    if (activeTab === tab) {
+      setActiveTab(null);
+    } else if (activeTab !== null && isDesktop) {
+      setPendingTab(tab);
+      setIsClosing(true);
+      setActiveTab(null);
+    } else {
+      setActiveTab(tab);
+    }
+  }, [activeTab, isDesktop]);
 
   const expensesByCategory = expenseTransactions.reduce((acc, t) => {
     const category = t.category || 'Uncategorized';
@@ -214,7 +232,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     .slice(0, 6);
 
   const getCardClasses = (tab: TabType, baseColor: string, borderColor: string, forDesktop: boolean = false) => {
-    const isActive = activeTab === tab;
+    const isActive = activeTab === tab || pendingTab === tab;
     if (isActive) {
       if (forDesktop) {
         return cn(
@@ -236,7 +254,8 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
 
   const getContentPanelRounding = (tab: TabType) => {
     if (!isDesktop) return "rounded-xl";
-    switch (tab) {
+    const effectiveTab = isClosing ? displayedTab : tab;
+    switch (effectiveTab) {
       case 'profit': return "rounded-tr-xl rounded-b-xl";
       case 'tax': return "rounded-tl-xl rounded-b-xl";
       default: return "rounded-xl";
@@ -574,8 +593,12 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
           </Card>
         </div>
         
-        <AnimatedPanel isActive={activeTab !== null} contentKey={activeTab}>
-          {renderContent(activeTab)}
+        <AnimatedPanel 
+          isActive={activeTab !== null} 
+          contentKey={activeTab}
+          onCollapseEnd={handleCollapseEnd}
+        >
+          {renderContent(isClosing ? displayedTab : activeTab)}
         </AnimatedPanel>
       </div>
     );
