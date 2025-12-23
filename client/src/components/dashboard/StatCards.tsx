@@ -187,7 +187,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       )}>
         <Card className="border-0 border-l-2 border-r-2 border-b-2 border-amber-500 dark:border-amber-500 rounded-t-none bg-slate-50 dark:bg-slate-900">
           <CardContent className="pt-4">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-6 md:grid-cols-3">
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tax Components</h4>
                 <div className="space-y-2">
@@ -224,24 +224,6 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
                   <div className="flex justify-between text-sm">
                     <span>Higher Rate (40%)</span>
                     <span className="font-medium">{formatCurrency(taxBreakdown.higherRateTax)}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Summary</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Taxable Profit</span>
-                    <span className="font-medium">{formatCurrency(profit)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Total Tax</span>
-                    <span className="font-medium">{formatCurrency(taxBreakdown.totalTax)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t pt-2">
-                    <span>Effective Rate</span>
-                    <span className="text-amber-600">{taxBreakdown.effectiveRate.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
