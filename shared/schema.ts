@@ -140,3 +140,23 @@ export const insertExcludedFingerprintSchema = createInsertSchema(excludedFinger
 
 export type InsertExcludedFingerprint = z.infer<typeof insertExcludedFingerprintSchema>;
 export type ExcludedFingerprint = typeof excludedFingerprints.$inferSelect;
+
+// Mileage trips for tracking business miles and calculating HMRC mileage allowance
+export const mileageTrips = pgTable("mileage_trips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: timestamp("date").notNull(),
+  description: text("description").notNull(),
+  miles: decimal("miles", { precision: 10, scale: 2 }).notNull(),
+  transactionId: varchar("transaction_id").references(() => transactions.id), // Optional link to a transaction
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMileageTripSchema = createInsertSchema(mileageTrips).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  miles: z.string().or(z.number()),
+});
+
+export type InsertMileageTrip = z.infer<typeof insertMileageTripSchema>;
+export type MileageTrip = typeof mileageTrips.$inferSelect;

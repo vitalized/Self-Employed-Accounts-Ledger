@@ -26,6 +26,13 @@ export const SA103_EXPENSE_CATEGORIES = [
   { code: "C4", label: "Website and Hosting", description: "Website hosting, domain names and web services" },
 ] as const;
 
+// Special category for transactions covered by mileage allowance (not included in expenses)
+export const MILEAGE_CATEGORY = {
+  code: "MILEAGE",
+  label: "Covered by Mileage Allowance",
+  description: "Cost already covered by HMRC mileage allowance (45p/25p per mile) - not counted as expense"
+} as const;
+
 export const INCOME_CATEGORIES = [
   { code: "I3", label: "Commission", description: "Commission income" },
   { code: "I2", label: "Consulting", description: "Consulting or freelance income" },

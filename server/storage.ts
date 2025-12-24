@@ -1,4 +1,4 @@
-import { users, transactions, settings, categorizationRules, transactionNotes, categories, excludedFingerprints, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory, type InsertExcludedFingerprint, type ExcludedFingerprint } from "@shared/schema";
+import { users, transactions, settings, categorizationRules, transactionNotes, categories, excludedFingerprints, mileageTrips, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory, type InsertExcludedFingerprint, type ExcludedFingerprint, type MileageTrip, type InsertMileageTrip } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, ilike, between, sql } from "drizzle-orm";
 
@@ -55,6 +55,16 @@ export interface IStorage {
   getExcludedFingerprints(): Promise<Set<string>>;
   addExcludedFingerprint(exclusion: InsertExcludedFingerprint): Promise<ExcludedFingerprint>;
   isExcluded(fingerprint: string): Promise<boolean>;
+  
+  // Mileage trips methods
+  getMileageTrips(): Promise<MileageTrip[]>;
+  getMileageTrip(id: string): Promise<MileageTrip | undefined>;
+  getMileageTripByTransactionId(transactionId: string): Promise<MileageTrip | undefined>;
+  createMileageTrip(trip: InsertMileageTrip): Promise<MileageTrip>;
+  updateMileageTrip(id: string, updates: Partial<InsertMileageTrip>): Promise<MileageTrip | undefined>;
+  deleteMileageTrip(id: string): Promise<boolean>;
+  deleteMileageTripByTransactionId(transactionId: string): Promise<boolean>;
+  getMileageTotalForTaxYear(taxYearStart: Date, taxYearEnd: Date): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -485,6 +495,77 @@ export class DatabaseStorage implements IStorage {
       .from(excludedFingerprints)
       .where(eq(excludedFingerprints.fingerprint, fingerprint));
     return !!result;
+  }
+
+  // Mileage trips methods
+  async getMileageTrips(): Promise<MileageTrip[]> {
+    return await db.select()
+      .from(mileageTrips)
+      .orderBy(desc(mileageTrips.date));
+  }
+
+  async getMileageTrip(id: string): Promise<MileageTrip | undefined> {
+    const [trip] = await db.select()
+      .from(mileageTrips)
+      .where(eq(mileageTrips.id, id));
+    return trip || undefined;
+  }
+
+  async getMileageTripByTransactionId(transactionId: string): Promise<MileageTrip | undefined> {
+    const [trip] = await db.select()
+      .from(mileageTrips)
+      .where(eq(mileageTrips.transactionId, transactionId));
+    return trip || undefined;
+  }
+
+  async createMileageTrip(insertTrip: InsertMileageTrip): Promise<MileageTrip> {
+    const values = {
+      ...insertTrip,
+      miles: String(insertTrip.miles),
+    };
+    const [trip] = await db
+      .insert(mileageTrips)
+      .values(values)
+      .returning();
+    return trip;
+  }
+
+  async updateMileageTrip(id: string, updates: Partial<InsertMileageTrip>): Promise<MileageTrip | undefined> {
+    const values: Record<string, any> = { ...updates };
+    if (updates.miles !== undefined) {
+      values.miles = String(updates.miles);
+    }
+    const [trip] = await db
+      .update(mileageTrips)
+      .set(values)
+      .where(eq(mileageTrips.id, id))
+      .returning();
+    return trip || undefined;
+  }
+
+  async deleteMileageTrip(id: string): Promise<boolean> {
+    const result = await db
+      .delete(mileageTrips)
+      .where(eq(mileageTrips.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async deleteMileageTripByTransactionId(transactionId: string): Promise<boolean> {
+    const result = await db
+      .delete(mileageTrips)
+      .where(eq(mileageTrips.transactionId, transactionId))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getMileageTotalForTaxYear(taxYearStart: Date, taxYearEnd: Date): Promise<number> {
+    const result = await db.select({
+      total: sql<string>`COALESCE(SUM(${mileageTrips.miles}), 0)`
+    })
+      .from(mileageTrips)
+      .where(between(mileageTrips.date, taxYearStart, taxYearEnd));
+    return parseFloat(result[0]?.total || '0');
   }
 }
 

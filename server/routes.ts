@@ -1213,5 +1213,152 @@ export async function registerRoutes(
     }
   });
 
+  // =========== Mileage Trips API ===========
+  
+  // Get all mileage trips
+  app.get("/api/mileage-trips", async (req, res) => {
+    try {
+      const trips = await storage.getMileageTrips();
+      res.json(trips);
+    } catch (error) {
+      console.error("Error fetching mileage trips:", error);
+      res.status(500).json({ error: "Failed to fetch mileage trips" });
+    }
+  });
+
+  // Get mileage summary for a tax year
+  app.get("/api/mileage-summary", async (req, res) => {
+    try {
+      const { taxYear } = req.query;
+      
+      // Parse tax year (format: "2024-25")
+      let taxYearStart: Date;
+      let taxYearEnd: Date;
+      
+      if (taxYear && typeof taxYear === 'string') {
+        const startYear = parseInt(taxYear.split('-')[0]);
+        taxYearStart = new Date(startYear, 3, 6); // April 6
+        taxYearEnd = new Date(startYear + 1, 3, 5, 23, 59, 59); // April 5 next year
+      } else {
+        // Default to current tax year
+        const now = new Date();
+        const startYear = now.getMonth() >= 3 && now.getDate() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+        taxYearStart = new Date(startYear, 3, 6);
+        taxYearEnd = new Date(startYear + 1, 3, 5, 23, 59, 59);
+      }
+      
+      const totalMiles = await storage.getMileageTotalForTaxYear(taxYearStart, taxYearEnd);
+      
+      // Calculate HMRC mileage allowance (45p first 10,000 miles, 25p thereafter)
+      let allowance = 0;
+      if (totalMiles <= 10000) {
+        allowance = totalMiles * 0.45;
+      } else {
+        allowance = (10000 * 0.45) + ((totalMiles - 10000) * 0.25);
+      }
+      
+      // Get all trips in the tax year range for the list
+      const allTrips = await storage.getMileageTrips();
+      const tripsInYear = allTrips.filter(t => {
+        const tripDate = new Date(t.date);
+        return tripDate >= taxYearStart && tripDate <= taxYearEnd;
+      });
+      
+      res.json({
+        taxYear: taxYear || `${taxYearStart.getFullYear()}-${String(taxYearEnd.getFullYear()).slice(-2)}`,
+        totalMiles,
+        allowance: parseFloat(allowance.toFixed(2)),
+        tripCount: tripsInYear.length,
+        trips: tripsInYear
+      });
+    } catch (error) {
+      console.error("Error calculating mileage summary:", error);
+      res.status(500).json({ error: "Failed to calculate mileage summary" });
+    }
+  });
+
+  // Get mileage trip by transaction ID
+  app.get("/api/mileage-trips/by-transaction/:transactionId", async (req, res) => {
+    try {
+      const trip = await storage.getMileageTripByTransactionId(req.params.transactionId);
+      if (!trip) {
+        return res.status(404).json({ error: "Mileage trip not found" });
+      }
+      res.json(trip);
+    } catch (error) {
+      console.error("Error fetching mileage trip:", error);
+      res.status(500).json({ error: "Failed to fetch mileage trip" });
+    }
+  });
+
+  // Create mileage trip
+  app.post("/api/mileage-trips", async (req, res) => {
+    try {
+      const { date, description, miles, transactionId } = req.body;
+      
+      if (!date || !description || miles === undefined) {
+        return res.status(400).json({ error: "Missing required fields: date, description, miles" });
+      }
+      
+      const trip = await storage.createMileageTrip({
+        date: new Date(date),
+        description,
+        miles: parseFloat(miles),
+        transactionId: transactionId || null,
+      });
+      
+      res.json(trip);
+    } catch (error) {
+      console.error("Error creating mileage trip:", error);
+      res.status(500).json({ error: "Failed to create mileage trip" });
+    }
+  });
+
+  // Update mileage trip
+  app.patch("/api/mileage-trips/:id", async (req, res) => {
+    try {
+      const { date, description, miles } = req.body;
+      const updates: Record<string, any> = {};
+      
+      if (date) updates.date = new Date(date);
+      if (description) updates.description = description;
+      if (miles !== undefined) updates.miles = parseFloat(miles);
+      
+      const trip = await storage.updateMileageTrip(req.params.id, updates);
+      if (!trip) {
+        return res.status(404).json({ error: "Mileage trip not found" });
+      }
+      res.json(trip);
+    } catch (error) {
+      console.error("Error updating mileage trip:", error);
+      res.status(500).json({ error: "Failed to update mileage trip" });
+    }
+  });
+
+  // Delete mileage trip
+  app.delete("/api/mileage-trips/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteMileageTrip(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Mileage trip not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting mileage trip:", error);
+      res.status(500).json({ error: "Failed to delete mileage trip" });
+    }
+  });
+
+  // Delete mileage trip by transaction ID (used when changing category away from mileage)
+  app.delete("/api/mileage-trips/by-transaction/:transactionId", async (req, res) => {
+    try {
+      await storage.deleteMileageTripByTransactionId(req.params.transactionId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting mileage trip:", error);
+      res.status(500).json({ error: "Failed to delete mileage trip" });
+    }
+  });
+
   return httpServer;
 }
