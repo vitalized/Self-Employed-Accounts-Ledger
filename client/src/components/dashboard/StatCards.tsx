@@ -245,7 +245,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       } else {
         return cn(
           "cursor-pointer transition-all",
-          `border-2 ${borderColor} ${baseColor} rounded-b-none`
+          `border-2 border-b-0 ${borderColor} ${baseColor} rounded-b-none`
         );
       }
     }
@@ -255,8 +255,8 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     );
   };
 
-  const getContentPanelRounding = (tab: TabType) => {
-    if (!isDesktop) return "rounded-xl";
+  const getContentPanelClasses = (tab: TabType) => {
+    if (!isDesktop) return "rounded-t-none rounded-b-xl border-t-0";
     const effectiveTab = isClosing ? displayedTab : tab;
     switch (effectiveTab) {
       case 'profit': return "rounded-tl-none rounded-tr-xl rounded-b-xl";
@@ -266,7 +266,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   };
 
   const ProfitContent = () => (
-    <Card className={cn("border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-950", getContentPanelRounding('profit'))}>
+    <Card className={cn("border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-950", getContentPanelClasses('profit'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -324,7 +324,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const IncomeContent = () => (
-    <Card className={cn("border-2 border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950", getContentPanelRounding('income'))}>
+    <Card className={cn("border-2 border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950", getContentPanelClasses('income'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -379,7 +379,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const ExpensesContent = () => (
-    <Card className={cn("border-2 border-red-500 dark:border-red-500 bg-red-50 dark:bg-red-950", getContentPanelRounding('expenses'))}>
+    <Card className={cn("border-2 border-red-500 dark:border-red-500 bg-red-50 dark:bg-red-950", getContentPanelClasses('expenses'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -432,7 +432,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const TaxContent = () => (
-    <Card className={cn("border-2 border-amber-500 dark:border-amber-500 bg-amber-50 dark:bg-amber-950", getContentPanelRounding('tax'))}>
+    <Card className={cn("border-2 border-amber-500 dark:border-amber-500 bg-amber-50 dark:bg-amber-950", getContentPanelClasses('tax'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
