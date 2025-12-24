@@ -5,9 +5,10 @@ import { TransactionChart } from "@/components/dashboard/TransactionChart";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { Filters } from "@/components/dashboard/Filters";
 import { VATTracker } from "@/components/dashboard/VATTracker";
+import { PendingPaymentsTable } from "@/components/dashboard/PendingPaymentsTable";
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { FilterState, Transaction } from "@/lib/types";
-import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format } from "date-fns";
+import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format, isFuture, isAfter, startOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, useUpdateTransaction } from "@/lib/queries";
 import { useDataMode } from "@/lib/dataContext";
@@ -133,22 +134,38 @@ export default function Dashboard() {
 
   const dateRange = getDateRange(filters.dateRange);
 
-  // Filter Transactions
+  // Separate pending (future-dated) from cleared transactions
+  const { pendingTransactions, clearedTransactions } = useMemo(() => {
+    const today = startOfDay(new Date());
+    const pending: Transaction[] = [];
+    const cleared: Transaction[] = [];
+    
+    transactions.forEach(t => {
+      const tDate = parseISO(t.date);
+      // Pending if status is 'Pending' or date is in the future
+      if (t.status === 'Pending' || isAfter(tDate, today)) {
+        pending.push(t);
+      } else {
+        cleared.push(t);
+      }
+    });
+    
+    return { pendingTransactions: pending, clearedTransactions: cleared };
+  }, [transactions]);
+
+  // Filter Transactions (only cleared ones for main view, charts, reports)
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    return clearedTransactions.filter(t => {
       const tDate = parseISO(t.date);
       
       // Date Filter
       if (!isWithinInterval(tDate, dateRange)) {
-         // Allow for generous range if 'tax-year' to catch outliers in mock data if necessary, 
-         // but strictly following logic:
          return false; 
       }
 
       // Type Filter
       if (filters.type && filters.type !== 'All') {
         if (filters.type === 'Unreviewed') {
-          // Include transactions that are Unreviewed OR Business without a category
           const needsReview = t.type === 'Unreviewed' || (t.type === 'Business' && !t.category);
           if (!needsReview) return false;
         } else if (filters.type === 'Business') {
@@ -177,7 +194,7 @@ export default function Dashboard() {
 
       return true;
     });
-  }, [transactions, filters, dateRange]);
+  }, [clearedTransactions, filters, dateRange]);
 
   const handleTransactionUpdate = async (id: string, updates: Partial<Transaction>) => {
     try {
@@ -283,6 +300,14 @@ export default function Dashboard() {
             dateRange={dateRange}
           />
         </div>
+
+        {pendingTransactions.length > 0 && (
+          <PendingPaymentsTable
+            transactions={pendingTransactions}
+            onUpdateTransaction={handleTransactionUpdate}
+            onRefresh={refetch}
+          />
+        )}
 
         <div>
            <div className="flex items-center justify-between py-4">
