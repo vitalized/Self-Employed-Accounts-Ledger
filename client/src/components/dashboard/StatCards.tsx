@@ -236,37 +236,52 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
 
   const getCardClasses = (tab: TabType, baseColor: string, borderColor: string, forDesktop: boolean = false) => {
     const isActive = activeTab === tab || pendingTab === tab || (isClosing && displayedTab === tab);
+    const isClosingToNull = isClosing && displayedTab === tab && pendingTab === null;
+    
     if (isActive) {
       if (forDesktop) {
         return cn(
-          "cursor-pointer transition-all",
+          "cursor-pointer transition-all duration-300",
           `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} ${baseColor} rounded-b-none -mb-[18px] relative z-10`
         );
       } else {
+        if (isClosingToNull) {
+          return cn(
+            "cursor-pointer transition-all duration-300",
+            "border border-b-0 border-slate-200 dark:border-slate-800 rounded-b-none"
+          );
+        }
         return cn(
-          "cursor-pointer transition-all",
+          "cursor-pointer transition-all duration-300",
           `border-2 border-b-0 ${borderColor} ${baseColor} rounded-b-none`
         );
       }
     }
     return cn(
-      "cursor-pointer transition-all",
+      "cursor-pointer transition-all duration-300",
       "border border-slate-200 dark:border-slate-800"
     );
   };
 
-  const getContentPanelClasses = (tab: TabType) => {
-    if (!isDesktop) return "rounded-t-none rounded-b-xl border-t-0";
+  const isClosingToNull = isClosing && pendingTab === null;
+  
+  const getContentPanelClasses = (tab: TabType, borderColor: string, bgColor: string) => {
+    if (!isDesktop) {
+      if (isClosingToNull && displayedTab === tab) {
+        return "rounded-t-none rounded-b-xl border-t-0 transition-all duration-300 border-slate-200 dark:border-slate-800 bg-transparent";
+      }
+      return `rounded-t-none rounded-b-xl border-t-0 transition-all duration-300 ${borderColor} ${bgColor}`;
+    }
     const effectiveTab = isClosing ? displayedTab : tab;
     switch (effectiveTab) {
-      case 'profit': return "rounded-tl-none rounded-tr-xl rounded-b-xl";
-      case 'tax': return "rounded-tr-none rounded-tl-xl rounded-b-xl";
-      default: return "rounded-xl";
+      case 'profit': return `rounded-tl-none rounded-tr-xl rounded-b-xl ${borderColor} ${bgColor}`;
+      case 'tax': return `rounded-tr-none rounded-tl-xl rounded-b-xl ${borderColor} ${bgColor}`;
+      default: return `rounded-xl ${borderColor} ${bgColor}`;
     }
   };
 
   const ProfitContent = () => (
-    <Card className={cn("border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-950", getContentPanelClasses('profit'))}>
+    <Card className={cn("border-2", getContentPanelClasses('profit', 'border-blue-500 dark:border-blue-500', 'bg-blue-50 dark:bg-blue-950'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -324,7 +339,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const IncomeContent = () => (
-    <Card className={cn("border-2 border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950", getContentPanelClasses('income'))}>
+    <Card className={cn("border-2", getContentPanelClasses('income', 'border-emerald-500 dark:border-emerald-500', 'bg-emerald-50 dark:bg-emerald-950'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -379,7 +394,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const ExpensesContent = () => (
-    <Card className={cn("border-2 border-red-500 dark:border-red-500 bg-red-50 dark:bg-red-950", getContentPanelClasses('expenses'))}>
+    <Card className={cn("border-2", getContentPanelClasses('expenses', 'border-red-500 dark:border-red-500', 'bg-red-50 dark:bg-red-950'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
@@ -432,7 +447,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   );
 
   const TaxContent = () => (
-    <Card className={cn("border-2 border-amber-500 dark:border-amber-500 bg-amber-50 dark:bg-amber-950", getContentPanelClasses('tax'))}>
+    <Card className={cn("border-2", getContentPanelClasses('tax', 'border-amber-500 dark:border-amber-500', 'bg-amber-50 dark:bg-amber-950'))}>
       <CardContent className="pt-4">
         <div className="grid gap-6 md:gap-12 grid-cols-1 md:grid-cols-3">
           <div className="space-y-3">
