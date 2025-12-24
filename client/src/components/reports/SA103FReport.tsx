@@ -2,20 +2,38 @@ import { useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Car } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
 import * as XLSX from "xlsx";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { parseISO, format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
 
 interface SA103FReportProps {
   transactions: Transaction[];
   yearLabel: string;
 }
 
+interface MileageSummary {
+  taxYear: string;
+  totalMiles: number;
+  allowance: number;
+  tripCount: number;
+}
+
 export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Fetch mileage summary for the tax year
+  const { data: mileageSummary } = useQuery<MileageSummary>({
+    queryKey: ["/api/mileage-summary", yearLabel],
+    queryFn: async () => {
+      const res = await fetch(`/api/mileage-summary?taxYear=${yearLabel}`);
+      if (!res.ok) throw new Error("Failed to fetch mileage summary");
+      return res.json();
+    },
+  });
 
   const data = useMemo(() => {
     let turnover = 0;
@@ -425,6 +443,49 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
               <IncomeRow label="NET PROFIT" box="47" value={data.netProfit} isTotal />
             </CardContent>
           </Card>
+
+          {/* Mileage Allowance Card */}
+          {mileageSummary && mileageSummary.totalMiles > 0 && (
+            <Card className="border-blue-200 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Car className="h-5 w-5 text-blue-600" />
+                  Mileage Allowance
+                </CardTitle>
+                <CardDescription>HMRC approved mileage rates (separate from vehicle expenses above)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Total business miles driven</span>
+                    <span className="font-medium">{mileageSummary.totalMiles.toLocaleString()} miles</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b text-sm">
+                    <span className="text-muted-foreground">Number of trips recorded</span>
+                    <span>{mileageSummary.tripCount} trips</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b text-sm">
+                    <span className="text-muted-foreground">First 10,000 miles @ 45p/mile</span>
+                    <span>£{Math.min(mileageSummary.totalMiles, 10000) * 0.45 < 1 ? '0.00' : (Math.min(mileageSummary.totalMiles, 10000) * 0.45).toFixed(2)}</span>
+                  </div>
+                  {mileageSummary.totalMiles > 10000 && (
+                    <div className="flex justify-between py-2 border-b text-sm">
+                      <span className="text-muted-foreground">Additional miles @ 25p/mile</span>
+                      <span>£{((mileageSummary.totalMiles - 10000) * 0.25).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-3 font-bold text-lg border-t-2">
+                    <span>Total Mileage Allowance Claim</span>
+                    <span className="text-blue-600">£{mileageSummary.allowance.toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This is claimed separately on your tax return. Costs categorized as "Covered by Mileage Allowance" 
+                    are not included in expenses above to avoid double claiming.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="tax" className="mt-6 space-y-6">
