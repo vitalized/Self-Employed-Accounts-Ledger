@@ -9,9 +9,16 @@ import {
   SelectLabel,
   SelectSeparator,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { DateFilter, FilterState } from "@/lib/types";
-import { Search, Download, RefreshCw, CalendarIcon, X, AlertCircle } from "lucide-react";
+import { Search, Download, RefreshCw, CalendarIcon, X, AlertCircle, MoreHorizontal } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -38,32 +45,20 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
     },
   });
 
+  const hasActiveFilters = filterState.search || filterState.type || filterState.category || filterState.dateRange !== 'this-month';
+
   return (
-    <div className="mb-6 flex flex-col space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant={filterState.type === 'Unreviewed' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => onFilterChange({ type: filterState.type === 'Unreviewed' ? undefined : 'Unreviewed' })}
-          className={cn(
-            filterState.type === 'Unreviewed' 
-              ? "bg-amber-500 hover:bg-amber-600 text-white" 
-              : "border-amber-300 text-amber-700 hover:bg-amber-50"
-          )}
-          data-testid="button-needs-review"
-        >
-          <AlertCircle className="mr-1 h-4 w-4" />
-          Needs Review
-        </Button>
-        
-        <div className="relative w-full max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+    <div className="mb-6 space-y-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-sm min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Search transactions..."
-            className="pl-9"
+            className="pl-9 h-9"
             value={filterState.search}
             onChange={(e) => onFilterChange({ search: e.target.value })}
+            data-testid="input-search"
           />
         </div>
         
@@ -71,7 +66,8 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           value={filterState.dateRange} 
           onValueChange={(value) => onFilterChange({ dateRange: value as DateFilter })}
         >
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[160px] sm:w-[180px] h-9" data-testid="select-date-range">
+            <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent className="max-h-[400px]">
@@ -103,18 +99,18 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
         </Select>
 
         {filterState.dateRange === 'custom' && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
-                  variant={"outline"}
+                  variant="outline"
+                  size="sm"
                   className={cn(
-                    "w-[140px] justify-start text-left font-normal",
+                    "flex-1 sm:flex-none sm:w-[100px] h-9 justify-start text-left font-normal text-sm",
                     !filterState.customStartDate && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {filterState.customStartDate ? format(filterState.customStartDate, "dd/MM/yyyy") : <span>Start date</span>}
+                  {filterState.customStartDate ? format(filterState.customStartDate, "dd/MM/yy") : "Start"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -127,20 +123,18 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                 />
               </PopoverContent>
             </Popover>
-
-            <span className="text-muted-foreground">-</span>
-
+            <span className="text-muted-foreground text-sm">to</span>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
-                  variant={"outline"}
+                  variant="outline"
+                  size="sm"
                   className={cn(
-                    "w-[140px] justify-start text-left font-normal",
+                    "flex-1 sm:flex-none sm:w-[100px] h-9 justify-start text-left font-normal text-sm",
                     !filterState.customEndDate && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {filterState.customEndDate ? format(filterState.customEndDate, "dd/MM/yyyy") : <span>End date</span>}
+                  {filterState.customEndDate ? format(filterState.customEndDate, "dd/MM/yy") : "End"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -156,11 +150,52 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           </div>
         )}
 
+        <div className="ml-auto sm:ml-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9" data-testid="button-actions-menu">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onRefresh} disabled={isSyncing} data-testid="menu-sync-bank">
+                <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
+                {isSyncing ? "Syncing..." : "Sync Bank"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onExport} data-testid="menu-export-csv">
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={filterState.type === 'Unreviewed' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onFilterChange({ type: filterState.type === 'Unreviewed' ? undefined : 'Unreviewed' })}
+          className={cn(
+            "h-8",
+            filterState.type === 'Unreviewed' 
+              ? "bg-amber-500 hover:bg-amber-600 text-white" 
+              : "border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+          )}
+          data-testid="button-needs-review"
+        >
+          <AlertCircle className="mr-1.5 h-3.5 w-3.5" />
+          Needs Review
+        </Button>
+
+        <div className="h-4 w-px bg-border" />
+        
         <Select 
           value={filterState.type || "All"} 
           onValueChange={(value) => onFilterChange({ type: value === 'All' ? undefined : value as any })}
         >
-          <SelectTrigger className="w-[130px]">
+          <SelectTrigger className="w-[120px] h-8 text-sm" data-testid="filter-type">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -177,7 +212,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           value={filterState.category || "All"} 
           onValueChange={(value) => onFilterChange({ category: value === 'All' ? undefined : value })}
         >
-          <SelectTrigger className="w-[180px]" data-testid="filter-category">
+          <SelectTrigger className="w-[160px] h-8 text-sm" data-testid="filter-category">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent className="max-h-[300px] overflow-y-auto">
@@ -196,36 +231,29 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
             </SelectGroup>
           </SelectContent>
         </Select>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {(filterState.search || filterState.type || filterState.category || filterState.dateRange !== 'this-month') && (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => onFilterChange({ 
-              search: '', 
-              type: undefined, 
-              category: undefined, 
-              dateRange: 'this-month',
-              customStartDate: undefined,
-              customEndDate: undefined
-            })}
-            className="text-muted-foreground hover:text-foreground"
-            data-testid="button-clear-filters"
-          >
-            <X className="mr-1 h-4 w-4" />
-            Clear Filters
-          </Button>
+        {hasActiveFilters && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => onFilterChange({ 
+                search: '', 
+                type: undefined, 
+                category: undefined, 
+                dateRange: 'this-month',
+                customStartDate: undefined,
+                customEndDate: undefined
+              })}
+              className="h-8 text-muted-foreground hover:text-foreground px-2"
+              data-testid="button-clear-filters"
+            >
+              <X className="mr-1 h-3.5 w-3.5" />
+              Clear
+            </Button>
+          </>
         )}
-        <Button variant="outline" onClick={onRefresh} disabled={isSyncing}>
-          <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
-          {isSyncing ? "Syncing..." : "Sync Bank"}
-        </Button>
-        <Button onClick={onExport} className="bg-emerald-600 hover:bg-emerald-700">
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
       </div>
     </div>
   );
