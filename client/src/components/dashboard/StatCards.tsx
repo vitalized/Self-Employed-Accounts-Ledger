@@ -210,7 +210,10 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   }, [pendingTab]);
 
   const toggleTab = useCallback((tab: TabType) => {
+    if (isClosing) return;
+    
     if (activeTab === tab) {
+      setIsClosing(true);
       setActiveTab(null);
     } else if (activeTab !== null && isDesktop) {
       setPendingTab(tab);
@@ -219,7 +222,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     } else {
       setActiveTab(tab);
     }
-  }, [activeTab, isDesktop]);
+  }, [activeTab, isDesktop, isClosing]);
 
   const expensesByCategory = expenseTransactions.reduce((acc, t) => {
     const category = t.category || 'Uncategorized';
