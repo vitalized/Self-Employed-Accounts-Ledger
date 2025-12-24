@@ -224,11 +224,80 @@ export default function Dashboard() {
     }
   };
 
-  const handleExport = () => {
-    toast({
-      title: "Exporting Data",
-      description: `Downloading transactions for ${filters.dateRange}...`,
-    });
+  const handleExport = (type: 'csv' | 'my-tax-digital') => {
+    if (filteredTransactions.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no transactions matching your current filters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Helper to safely format dates - returns ISO date or original string if parsing fails
+    const safeFormatDate = (dateStr: string): string => {
+      try {
+        const parsed = parseISO(dateStr);
+        if (isNaN(parsed.getTime())) {
+          return dateStr; // Return original if invalid
+        }
+        return format(parsed, 'yyyy-MM-dd');
+      } catch {
+        return dateStr; // Return original on error
+      }
+    };
+
+    let csvContent: string;
+    let filename: string;
+
+    if (type === 'my-tax-digital') {
+      // My Tax Digital format - optimized for their import
+      // Columns: Date, Description, Amount, Type, Category
+      const headers = ['Date', 'Description', 'Amount', 'Type', 'Category'];
+      const rows = filteredTransactions.map(t => [
+        safeFormatDate(t.date),
+        `"${(t.description || t.merchant || '').replace(/"/g, '""')}"`,
+        t.amount.toFixed(2),
+        t.type || '',
+        t.category || ''
+      ]);
+      csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      filename = `taxtrack-my-tax-digital-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      
+      toast({
+        title: "My Tax Digital Export Ready",
+        description: `Exported ${filteredTransactions.length} transactions. Import this file into My Tax Digital and map the columns.`,
+      });
+    } else {
+      // Standard CSV with all details
+      const headers = ['Date', 'Description', 'Merchant', 'Amount', 'Type', 'Category', 'Status'];
+      const rows = filteredTransactions.map(t => [
+        safeFormatDate(t.date),
+        `"${(t.description || '').replace(/"/g, '""')}"`,
+        `"${(t.merchant || '').replace(/"/g, '""')}"`,
+        t.amount.toFixed(2),
+        t.type || '',
+        t.category || '',
+        t.status || ''
+      ]);
+      csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      filename = `taxtrack-export-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      
+      toast({
+        title: "Export Complete",
+        description: `Exported ${filteredTransactions.length} transactions.`,
+      });
+    }
+
+    // Download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
   };
 
   const handleRefresh = async () => {

@@ -26,11 +26,13 @@ import { cn } from "@/lib/utils";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useQuery } from "@tanstack/react-query";
 
+type ExportType = 'csv' | 'my-tax-digital';
+
 interface FiltersProps {
   filterState: FilterState;
   onFilterChange: (updates: Partial<FilterState>) => void;
   onRefresh: () => void;
-  onExport: () => void;
+  onExport: (type: ExportType) => void;
   availableCategories: string[];
   isSyncing?: boolean;
 }
@@ -163,9 +165,13 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                 {isSyncing ? "Syncing..." : "Sync Bank"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onExport} data-testid="menu-export-csv">
+              <DropdownMenuItem onClick={() => onExport('csv')} data-testid="menu-export-csv">
                 <Download className="mr-2 h-4 w-4" />
                 Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport('my-tax-digital')} data-testid="menu-export-mtd">
+                <Download className="mr-2 h-4 w-4" />
+                Export for My Tax Digital
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
