@@ -717,6 +717,7 @@ export async function registerRoutes(
       }
 
       let totalImported = 0;
+      let totalStatusUpdated = 0;
 
       for (const account of accounts) {
         const accountUid = account.accountUid;
@@ -752,11 +753,19 @@ export async function registerRoutes(
           const feedItemUid = item.feedItemUid;
           
           // Check if we already have this transaction using full feedItemUid stored in tags
-          const alreadyExists = existingTransactions.some(
+          const existingTx = existingTransactions.find(
             t => t.tags?.includes(`starling:${feedItemUid}`)
           );
           
-          if (alreadyExists) continue;
+          if (existingTx) {
+            // Update status if it changed from Pending to Cleared
+            const newStatus = item.status === "SETTLED" ? "Cleared" : "Pending";
+            if (existingTx.status === "Pending" && newStatus === "Cleared") {
+              await storage.updateTransaction(existingTx.id, { status: "Cleared" });
+              totalStatusUpdated++;
+            }
+            continue;
+          }
           
           // Check if this transaction fingerprint is excluded (user deleted and marked do not reimport)
           const checkTxDate = new Date(item.transactionTime);
@@ -835,10 +844,22 @@ export async function registerRoutes(
       // Save the last sync timestamp
       await storage.setLastSyncAt(new Date());
       
+      const messageParts = [];
+      if (totalImported > 0) {
+        messageParts.push(`Imported ${totalImported} new transaction${totalImported === 1 ? '' : 's'}`);
+      }
+      if (totalStatusUpdated > 0) {
+        messageParts.push(`Updated ${totalStatusUpdated} pending transaction${totalStatusUpdated === 1 ? '' : 's'} to cleared`);
+      }
+      const message = messageParts.length > 0 
+        ? messageParts.join('. ') 
+        : 'All transactions are up to date';
+      
       res.json({ 
         success: true, 
-        imported: totalImported, 
-        message: `Imported ${totalImported} new transactions from Starling Bank`
+        imported: totalImported,
+        statusUpdated: totalStatusUpdated,
+        message
       });
     } catch (error) {
       console.error("Error syncing from Starling:", error);
