@@ -81,19 +81,20 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
               <SelectItem value="last-3-months">Last 3 Months</SelectItem>
               <SelectItem value="custom">Custom Date</SelectItem>
             </SelectGroup>
-            {taxYears.map((taxYear) => {
-              const startYear = parseInt(taxYear.split('-')[0]);
-              return (
-                <SelectGroup key={taxYear}>
-                  <SelectLabel>Tax Year {taxYear}</SelectLabel>
-                  <SelectItem value={`tax-year-${taxYear}`}>Full Year (6 Apr - 5 Apr)</SelectItem>
-                  <SelectItem value={`mtd-q1-${taxYear}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
-                  <SelectItem value={`mtd-q2-${taxYear}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
-                  <SelectItem value={`mtd-q3-${taxYear}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
-                  <SelectItem value={`mtd-q4-${taxYear}`}>MTD Q4 (6 Apr - 5 Apr)</SelectItem>
-                </SelectGroup>
-              );
-            })}
+            {taxYears.map((taxYear, index) => (
+              <SelectGroup key={taxYear}>
+                <SelectLabel>Tax Year {taxYear}</SelectLabel>
+                <SelectItem value={`tax-year-${taxYear}`}>Full Year (6 Apr - 5 Apr)</SelectItem>
+                {index === 0 && (
+                  <>
+                    <SelectItem value={`mtd-q1-${taxYear}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
+                    <SelectItem value={`mtd-q2-${taxYear}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
+                    <SelectItem value={`mtd-q3-${taxYear}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
+                    <SelectItem value={`mtd-q4-${taxYear}`}>MTD Q4 (6 Apr - 5 Apr)</SelectItem>
+                  </>
+                )}
+              </SelectGroup>
+            ))}
           </SelectContent>
         </Select>
 
