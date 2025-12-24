@@ -5,9 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Transaction } from "@/lib/types";
-import { format, differenceInDays, differenceInMonths, isBefore, isAfter, addMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, differenceInDays, differenceInCalendarMonths, isBefore, isAfter, addMonths, startOfMonth, endOfMonth } from "date-fns";
 import { Calculator, PiggyBank, Calendar, AlertCircle, TrendingUp, Wallet, Download, FileSpreadsheet, Info } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend, Cell } from "recharts";
 import * as XLSX from 'xlsx';
 import { useQuery } from "@tanstack/react-query";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
@@ -231,21 +231,25 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
     
     const daysToJan31 = Math.max(0, differenceInDays(jan31Date, now));
     const daysToJul31 = Math.max(0, differenceInDays(jul31Date, now));
-    const monthsToJan31 = Math.max(1, differenceInMonths(jan31Date, now));
-    const monthsToJul31 = Math.max(1, differenceInMonths(jul31Date, now));
+    // Use calendar months + 1 for inclusive count (current month counts as a saving month)
+    const monthsToJan31 = Math.max(1, differenceInCalendarMonths(jan31Date, now) + 1);
+    const monthsToJul31 = Math.max(1, differenceInCalendarMonths(jul31Date, now) + 1);
     
     // Calculate monthly amounts needed to meet EACH deadline
-    // Phase 1: Save enough for Jan 31 payment by January
+    // Phase 1: Save enough for Jan 31 payment by January (includes current month through January)
     const monthlyForJan = Math.ceil(jan31Total / monthsToJan31);
-    // Phase 2: After Jan, save enough for Jul 31 payment (6 months from Feb to Jul)
-    const monthsFromFebToJul = 6;
-    const monthlyForJul = Math.ceil(jul31Total / monthsFromFebToJul);
+    // Phase 2: After Jan, save enough for Jul 31 payment
+    // If we're already past January, calculate from current month; otherwise use 6 months (Feb-Jul)
+    const isPastJan = isBefore(jan31Date, now);
+    const monthsToJul = isPastJan 
+      ? Math.max(1, differenceInCalendarMonths(jul31Date, now) + 1)
+      : 6; // Feb through Jul = 6 months
+    const monthlyForJul = Math.ceil(jul31Total / monthsToJul);
     
     // Recommend the higher of the two to ensure both deadlines are met
     // If we're past January, just focus on July
-    const isPastJan = isBefore(jan31Date, now);
     const recommendedMonthly = isPastJan 
-      ? Math.ceil(jul31Total / Math.max(1, differenceInMonths(jul31Date, now)))
+      ? Math.ceil(jul31Total / Math.max(1, differenceInCalendarMonths(jul31Date, now) + 1))
       : Math.max(monthlyForJan, monthlyForJul);
     
     return {
@@ -273,39 +277,57 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
     const months: Array<{
       month: string;
       monthDate: Date;
+      monthlyAmount: number;
       accumulated: number;
       target: number;
+      isDeadlineMonth: boolean;
+      phase: 'jan' | 'jul';
       deadline?: string;
       deadlineAmount?: number;
     }> = [];
     
     let currentDate = startOfMonth(now);
     const endDate = new Date(endYear + 1, 7, 1);
+    const jan31Date = new Date(endYear + 1, 0, 31);
     let accumulated = 0;
-    const monthlyAmount = plannerData.monthlyTarget || paymentSchedule.recommendedMonthly;
+    
+    // If user set a custom target, use it for all months
+    // Otherwise, use phased amounts: higher before Jan, lower after
+    const useCustomTarget = plannerData.monthlyTarget > 0;
     
     while (isBefore(currentDate, endDate)) {
+      const isBeforeJan = isBefore(currentDate, jan31Date) || (currentDate.getMonth() === 0 && currentDate.getFullYear() === endYear + 1);
+      const isJanDeadline = currentDate.getMonth() === 0 && currentDate.getFullYear() === endYear + 1;
+      const isJulDeadline = currentDate.getMonth() === 6 && currentDate.getFullYear() === endYear + 1;
+      
+      // Phased monthly amounts: before Jan use jan rate, after Jan use jul rate
+      const monthlyAmount = useCustomTarget 
+        ? plannerData.monthlyTarget 
+        : (isBeforeJan ? paymentSchedule.monthlyForJan : paymentSchedule.monthlyForJul);
+      
       accumulated += monthlyAmount;
       
       const monthData: typeof months[0] = {
         month: format(currentDate, 'MMM yyyy'),
         monthDate: currentDate,
+        monthlyAmount: monthlyAmount,
         accumulated: Math.min(accumulated, paymentSchedule.totalOwed),
-        target: paymentSchedule.totalOwed
+        target: paymentSchedule.totalOwed,
+        isDeadlineMonth: isJanDeadline || isJulDeadline,
+        phase: isBeforeJan ? 'jan' : 'jul'
       };
       
-      const nextMonth = addMonths(currentDate, 1);
-      if (currentDate.getMonth() === 0 && currentDate.getFullYear() === endYear + 1) {
+      if (isJanDeadline) {
         monthData.deadline = '31 Jan';
         monthData.deadlineAmount = paymentSchedule.jan31Total;
       }
-      if (currentDate.getMonth() === 6 && currentDate.getFullYear() === endYear + 1) {
+      if (isJulDeadline) {
         monthData.deadline = '31 Jul';
         monthData.deadlineAmount = paymentSchedule.totalOwed;
       }
       
       months.push(monthData);
-      currentDate = nextMonth;
+      currentDate = addMonths(currentDate, 1);
     }
     
     return months;
@@ -574,11 +596,61 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Monthly Savings Progress
+            <PiggyBank className="h-5 w-5" />
+            Monthly Tax Savings
           </CardTitle>
           <CardDescription>
-            Track your savings against the total tax due
+            Amount to set aside each month - green for Jan phase, blue for Jul phase, orange for deadline months
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyBreakdown}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${value.toLocaleString()}`} />
+                <Tooltip 
+                  formatter={(value: number, name: string) => [`£${value.toLocaleString()}`, 'Monthly Amount']}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  labelFormatter={(label) => label}
+                />
+                <Bar dataKey="monthlyAmount" name="Monthly Savings" radius={[4, 4, 0, 0]}>
+                  {monthlyBreakdown.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.isDeadlineMonth ? '#f97316' : (entry.phase === 'jan' ? '#22c55e' : '#3b82f6')}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex gap-4 mt-4 text-sm justify-center">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-green-500" />
+              <span>Phase 1 (to Jan 31): £{paymentSchedule.monthlyForJan.toLocaleString()}/mo</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-blue-500" />
+              <span>Phase 2 (to Jul 31): £{paymentSchedule.monthlyForJul.toLocaleString()}/mo</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-orange-500" />
+              <span>Deadline month</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Cumulative Savings Progress
+          </CardTitle>
+          <CardDescription>
+            Track your total savings against the tax due
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -606,7 +678,7 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
         <CardHeader>
           <CardTitle>Month-by-Month Breakdown</CardTitle>
           <CardDescription>
-            Saving £{(plannerData.monthlyTarget || paymentSchedule.recommendedMonthly).toLocaleString()} per month
+            Phased savings: £{paymentSchedule.monthlyForJan.toLocaleString()}/mo until Jan, then £{paymentSchedule.monthlyForJul.toLocaleString()}/mo until Jul
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -623,7 +695,6 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
               </thead>
               <tbody>
                 {monthlyBreakdown.map((month, i) => {
-                  const monthlyAmount = plannerData.monthlyTarget || paymentSchedule.recommendedMonthly;
                   const remaining = paymentSchedule.totalOwed - month.accumulated;
                   const isDeadlineMonth = month.deadline;
                   
@@ -633,7 +704,7 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
                       className={`border-b ${isDeadlineMonth ? 'bg-orange-50 dark:bg-orange-950/30 font-medium' : ''}`}
                     >
                       <td className="py-2 px-2">{month.month}</td>
-                      <td className="text-right py-2 px-2">£{monthlyAmount.toLocaleString()}</td>
+                      <td className="text-right py-2 px-2">£{month.monthlyAmount.toLocaleString()}</td>
                       <td className="text-right py-2 px-2 text-green-600">£{month.accumulated.toLocaleString()}</td>
                       <td className="text-right py-2 px-2 text-orange-600">
                         {remaining > 0 ? `£${remaining.toLocaleString()}` : '£0'}
