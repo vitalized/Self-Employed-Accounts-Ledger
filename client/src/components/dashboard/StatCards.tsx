@@ -180,6 +180,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const [pendingTab, setPendingTab] = useState<TabType>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [displayedTab, setDisplayedTab] = useState<TabType>(null);
+  const [isFirstOpen, setIsFirstOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   
   useEffect(() => {
@@ -187,6 +188,16 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       setDisplayedTab(activeTab);
     }
   }, [activeTab]);
+  
+  useEffect(() => {
+    if (isFirstOpen) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsFirstOpen(false);
+        });
+      });
+    }
+  }, [isFirstOpen]);
   
   const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income');
   const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense');
@@ -220,6 +231,9 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
       setIsClosing(true);
       setActiveTab(null);
     } else {
+      if (activeTab === null && isDesktop) {
+        setIsFirstOpen(true);
+      }
       setActiveTab(tab);
     }
   }, [activeTab, isDesktop, isClosing]);
@@ -237,11 +251,12 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
   const getCardClasses = (tab: TabType, baseColor: string, borderColor: string, forDesktop: boolean = false) => {
     const isActive = activeTab === tab || pendingTab === tab || (isClosing && displayedTab === tab);
     const isClosingToNull = isClosing && displayedTab === tab && pendingTab === null;
+    const transitionClass = isFirstOpen ? "" : "transition-all duration-300";
     
     if (isActive) {
       if (forDesktop) {
         return cn(
-          "cursor-pointer transition-all duration-300",
+          `cursor-pointer ${transitionClass}`,
           `border-t-2 border-l-2 border-r-2 border-b-0 ${borderColor} ${baseColor} rounded-b-none -mb-[18px] relative z-10`
         );
       } else {
