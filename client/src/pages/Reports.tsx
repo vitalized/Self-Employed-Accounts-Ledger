@@ -16,6 +16,7 @@ import { MileageReport } from "@/components/reports/MileageReport";
 import { MTDQuarterlyReport } from "@/components/reports/MTDQuarterlyReport";
 import { UseOfHomeReport } from "@/components/reports/UseOfHomeReport";
 import { PaymentOnAccountReport } from "@/components/reports/PaymentOnAccountReport";
+import { TaxPaymentPlanner } from "@/components/reports/TaxPaymentPlanner";
 import { Calendar } from "lucide-react";
 
 const REPORT_TITLES: Record<string, { title: string; getDescription: (yearLabel: string) => string }> = {
@@ -28,6 +29,7 @@ const REPORT_TITLES: Record<string, { title: string; getDescription: (yearLabel:
   'mtd-quarterly': { title: 'MTD Quarterly Summary', getDescription: (y) => `Making Tax Digital quarterly updates (Tax Year ${y})` },
   'use-of-home': { title: 'Use of Home', getDescription: (y) => `Home office expense calculator (Tax Year ${y})` },
   'payment-on-account': { title: 'Payment on Account', getDescription: (y) => `HMRC payment tracker (Tax Year ${y})` },
+  'payment-planner': { title: 'Tax Payment Planner', getDescription: (y) => `Budget your tax payments (Tax Year ${y})` },
 };
 
 export default function Reports() {
@@ -162,6 +164,8 @@ export default function Reports() {
         return <UseOfHomeReport yearLabel={yearLabel} />;
       case 'payment-on-account':
         return <PaymentOnAccountReport transactions={filteredTransactions} yearLabel={yearLabel} />;
+      case 'payment-planner':
+        return <TaxPaymentPlanner transactions={filteredTransactions} yearLabel={yearLabel} />;
       default:
         return <SA103FReport transactions={filteredTransactions} yearLabel={yearLabel} />;
     }

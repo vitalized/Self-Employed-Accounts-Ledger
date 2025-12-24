@@ -23,7 +23,8 @@ import {
   Car,
   Calendar,
   Home,
-  Clock
+  Clock,
+  PiggyBank
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -44,6 +45,7 @@ const reportSubItems = [
   { href: "/reports/mtd-quarterly", label: "MTD Quarterly", icon: Calendar },
   { href: "/reports/use-of-home", label: "Use of Home", icon: Home },
   { href: "/reports/payment-on-account", label: "Payment on Account", icon: Clock },
+  { href: "/reports/payment-planner", label: "Tax Payment Planner", icon: PiggyBank },
 ];
 
 const settingsSubItems = [
