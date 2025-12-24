@@ -92,7 +92,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
               </SelectGroup>
             )}
             {taxYears.slice(1).map((taxYear) => (
-              <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>{taxYear}</SelectItem>
+              <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>Tax Year {taxYear}</SelectItem>
             ))}
           </SelectContent>
         </Select>
