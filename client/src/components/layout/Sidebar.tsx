@@ -20,7 +20,10 @@ import {
   ListFilter,
   Building,
   Sliders,
-  Car
+  Car,
+  Calendar,
+  Home,
+  Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -38,6 +41,9 @@ const reportSubItems = [
   { href: "/reports/tax-calculator", label: "Tax Calculator", icon: Calculator },
   { href: "/reports/vat", label: "VAT Summary", icon: ReceiptText },
   { href: "/reports/mileage", label: "Mileage Report", icon: Car },
+  { href: "/reports/mtd-quarterly", label: "MTD Quarterly", icon: Calendar },
+  { href: "/reports/use-of-home", label: "Use of Home", icon: Home },
+  { href: "/reports/payment-on-account", label: "Payment on Account", icon: Clock },
 ];
 
 const settingsSubItems = [

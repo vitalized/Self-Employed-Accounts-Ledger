@@ -13,6 +13,9 @@ import { ExpenseBreakdownReport } from "@/components/reports/ExpenseBreakdownRep
 import { TaxCalculatorReport } from "@/components/reports/TaxCalculatorReport";
 import { VATSummaryReport } from "@/components/reports/VATSummaryReport";
 import { MileageReport } from "@/components/reports/MileageReport";
+import { MTDQuarterlyReport } from "@/components/reports/MTDQuarterlyReport";
+import { UseOfHomeReport } from "@/components/reports/UseOfHomeReport";
+import { PaymentOnAccountReport } from "@/components/reports/PaymentOnAccountReport";
 import { Calendar } from "lucide-react";
 
 const REPORT_TITLES: Record<string, { title: string; getDescription: (yearLabel: string) => string }> = {
@@ -22,6 +25,9 @@ const REPORT_TITLES: Record<string, { title: string; getDescription: (yearLabel:
   'tax-calculator': { title: 'Tax Calculator', getDescription: (y) => `UK Income Tax & National Insurance (Tax Year ${y})` },
   'vat': { title: 'VAT Summary', getDescription: (y) => `VAT threshold tracking (Tax Year ${y})` },
   'mileage': { title: 'Mileage Report', getDescription: (y) => `Business mileage allowance tracker (Tax Year ${y})` },
+  'mtd-quarterly': { title: 'MTD Quarterly Summary', getDescription: (y) => `Making Tax Digital quarterly updates (Tax Year ${y})` },
+  'use-of-home': { title: 'Use of Home', getDescription: (y) => `Home office expense calculator (Tax Year ${y})` },
+  'payment-on-account': { title: 'Payment on Account', getDescription: (y) => `HMRC payment tracker (Tax Year ${y})` },
 };
 
 export default function Reports() {
@@ -150,6 +156,12 @@ export default function Reports() {
         return <VATSummaryReport transactions={filteredTransactions} yearLabel={yearLabel} />;
       case 'mileage':
         return <MileageReport yearLabel={yearLabel} />;
+      case 'mtd-quarterly':
+        return <MTDQuarterlyReport transactions={filteredTransactions} yearLabel={yearLabel} />;
+      case 'use-of-home':
+        return <UseOfHomeReport yearLabel={yearLabel} />;
+      case 'payment-on-account':
+        return <PaymentOnAccountReport transactions={filteredTransactions} yearLabel={yearLabel} />;
       default:
         return <SA103FReport transactions={filteredTransactions} yearLabel={yearLabel} />;
     }
