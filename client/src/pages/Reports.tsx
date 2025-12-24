@@ -153,7 +153,7 @@ export default function Reports() {
       case 'tax-calculator':
         return <TaxCalculatorReport transactions={filteredTransactions} yearLabel={yearLabel} />;
       case 'vat':
-        return <VATSummaryReport transactions={filteredTransactions} yearLabel={yearLabel} />;
+        return <VATSummaryReport transactions={filteredTransactions} allTransactions={transactions} yearLabel={yearLabel} />;
       case 'mileage':
         return <MileageReport yearLabel={yearLabel} />;
       case 'mtd-quarterly':

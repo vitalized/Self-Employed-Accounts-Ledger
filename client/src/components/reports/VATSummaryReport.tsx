@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 
 interface VATSummaryReportProps {
   transactions: Transaction[];
+  allTransactions: Transaction[];
   yearLabel: string;
 }
 
@@ -19,7 +20,7 @@ const VAT_THRESHOLD = 90000;
 const VAT_APPROACHING = 75000;
 const VAT_DANGER = 85000;
 
-export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportProps) {
+export function VATSummaryReport({ transactions, allTransactions, yearLabel }: VATSummaryReportProps) {
   const [viewMode, setViewMode] = useState<'taxYear' | 'rolling'>('taxYear');
   const [referenceDate, setReferenceDate] = useState(() => new Date());
   
@@ -86,6 +87,7 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
     const taxYearMonths: Record<string, number> = {};
     const rollingMonths: Record<string, number> = {};
 
+    // Calculate tax year data from filtered transactions
     transactions.forEach(t => {
       if (t.type === 'Business' && t.businessType === 'Income') {
         const amount = Number(t.amount);
@@ -97,6 +99,14 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
           const key = format(date, 'yyyy-MM');
           taxYearMonths[key] = (taxYearMonths[key] || 0) + amount;
         }
+      }
+    });
+
+    // Calculate rolling 12-month data from ALL transactions (not filtered)
+    allTransactions.forEach(t => {
+      if (t.type === 'Business' && t.businessType === 'Income') {
+        const amount = Number(t.amount);
+        const date = parseISO(t.date);
         
         if ((isAfter(date, twelveMonthsAgo) || format(date, 'yyyy-MM') === format(twelveMonthsAgo, 'yyyy-MM')) && 
             (isBefore(date, endOfReferenceMonth) || format(date, 'yyyy-MM') === format(endOfReferenceMonth, 'yyyy-MM'))) {
@@ -140,7 +150,7 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
         ...toMonthlyData(rollingMonths)
       }
     };
-  }, [transactions, referenceDate, taxYearDates]);
+  }, [transactions, allTransactions, referenceDate, taxYearDates]);
 
   const { displayIncome, status, monthlyBreakdown, cumulativeData } = useMemo(() => {
     const activeData = viewMode === 'rolling' ? rollingData : taxYearData;
