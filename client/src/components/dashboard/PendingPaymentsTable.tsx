@@ -125,19 +125,19 @@ export function PendingPaymentsTable({ transactions, onUpdateTransaction, onRefr
                 data-testid={`button-pending-type-business-${t.id}`}
                 variant={t.type === 'Business' ? 'default' : 'ghost'} 
                 size="sm"
-                className="h-5 text-[9px] px-1.5 rounded-none rounded-l border-0"
+                className="h-5 text-[9px] px-2 rounded-none rounded-l border-0"
                 onClick={() => handleTypeChange(t, 'Business')}
               >
-                Biz
+                Business
               </Button>
               <Button 
                 data-testid={`button-pending-type-personal-${t.id}`}
                 variant={t.type === 'Personal' ? 'secondary' : 'ghost'} 
                 size="sm"
-                className="h-5 text-[9px] px-1.5 rounded-none rounded-r border-0 border-l"
+                className="h-5 text-[9px] px-2 rounded-none rounded-r border-0 border-l"
                 onClick={() => handleTypeChange(t, 'Personal')}
               >
-                Per
+                Personal
               </Button>
             </div>
             {t.type === 'Business' ? (
