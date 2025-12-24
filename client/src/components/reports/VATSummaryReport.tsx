@@ -142,11 +142,15 @@ export function VATSummaryReport({ transactions, yearLabel }: VATSummaryReportPr
     };
   }, [transactions, referenceDate, taxYearDates]);
 
-  const activeData = viewMode === 'rolling' ? rollingData : taxYearData;
-  const displayIncome = activeData.income;
-  const status = activeData.status;
-  const monthlyBreakdown = activeData.monthlyBreakdown;
-  const cumulativeData = activeData.cumulativeData;
+  const { displayIncome, status, monthlyBreakdown, cumulativeData } = useMemo(() => {
+    const activeData = viewMode === 'rolling' ? rollingData : taxYearData;
+    return {
+      displayIncome: activeData.income,
+      status: activeData.status,
+      monthlyBreakdown: activeData.monthlyBreakdown,
+      cumulativeData: activeData.cumulativeData
+    };
+  }, [viewMode, rollingData, taxYearData]);
 
   const percentage = Math.min((displayIncome / VAT_THRESHOLD) * 100, 100);
   const remaining = Math.max(VAT_THRESHOLD - displayIncome, 0);
