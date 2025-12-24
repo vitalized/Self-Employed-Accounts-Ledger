@@ -96,7 +96,7 @@ export function PendingPaymentsTable({ transactions, onUpdateTransaction, onRefr
     <div className="rounded-lg border border-dashed border-amber-200/60 dark:border-amber-800/40 bg-amber-50/20 dark:bg-amber-900/5 px-4 py-3">
       <div className="flex items-center gap-2 mb-2">
         <Clock className="h-3.5 w-3.5 text-amber-500/70" />
-        <span className="text-sm font-medium text-amber-700/80 dark:text-amber-400/80">Due Payments</span>
+        <span className="text-sm font-medium text-amber-700/80 dark:text-amber-400/80">Upcoming Payments</span>
         <span className="text-xs text-amber-600/60 bg-amber-100/50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
           {transactions.length}
         </span>
