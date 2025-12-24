@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { parseISO, isWithinInterval, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
 import { useTransactions } from "@/lib/queries";
@@ -60,6 +60,27 @@ export default function Reports() {
   const getFilterDateRange = (filter: string) => {
     const now = new Date();
     
+    // Handle MTD quarter format: 'mtd-q1-YYYY-YY'
+    if (filter.startsWith('mtd-q')) {
+      const match = filter.match(/mtd-q(\d)-(\d{4})-(\d{2})/);
+      if (match) {
+        const quarter = parseInt(match[1]);
+        const startYear = parseInt(match[2]);
+        const taxYearStart = new Date(startYear, 3, 6); // April 6
+        
+        // MTD quarters are cumulative from April 6
+        let endDate: Date;
+        switch (quarter) {
+          case 1: endDate = new Date(startYear, 6, 5, 23, 59, 59); break; // 5 July
+          case 2: endDate = new Date(startYear, 9, 5, 23, 59, 59); break; // 5 October
+          case 3: endDate = new Date(startYear + 1, 0, 5, 23, 59, 59); break; // 5 January
+          case 4: endDate = new Date(startYear + 1, 3, 5, 23, 59, 59); break; // 5 April
+          default: endDate = new Date(startYear + 1, 3, 5, 23, 59, 59);
+        }
+        return { start: taxYearStart, end: endDate };
+      }
+    }
+    
     if (filter.startsWith('tax-year-')) {
       const taxYearStr = filter.replace('tax-year-', '');
       const startYear = parseInt(taxYearStr.split('-')[0]);
@@ -88,6 +109,12 @@ export default function Reports() {
   };
 
   const getYearLabel = (filter: string) => {
+    if (filter.startsWith('mtd-q')) {
+      const match = filter.match(/mtd-q(\d)-(\d{4}-\d{2})/);
+      if (match) {
+        return match[2]; // Returns the tax year portion
+      }
+    }
     if (filter.startsWith('tax-year-')) {
       return filter.replace('tax-year-', '');
     }
@@ -149,17 +176,25 @@ export default function Reports() {
           <div className="flex items-center gap-3">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[180px]" data-testid="select-report-period">
+              <SelectTrigger className="w-[220px]" data-testid="select-report-period">
                 <SelectValue placeholder="Select period" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="this-month">This Month</SelectItem>
-                <SelectItem value="last-month">Last Month</SelectItem>
-                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+              <SelectContent className="max-h-[400px]">
+                <SelectGroup>
+                  <SelectLabel>Quick Filters</SelectLabel>
+                  <SelectItem value="this-month">This Month</SelectItem>
+                  <SelectItem value="last-month">Last Month</SelectItem>
+                  <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                </SelectGroup>
                 {taxYears.map((taxYear) => (
-                  <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>
-                    Tax Year ({taxYear})
-                  </SelectItem>
+                  <SelectGroup key={taxYear}>
+                    <SelectLabel>Tax Year {taxYear}</SelectLabel>
+                    <SelectItem value={`tax-year-${taxYear}`}>Full Year (6 Apr - 5 Apr)</SelectItem>
+                    <SelectItem value={`mtd-q1-${taxYear}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
+                    <SelectItem value={`mtd-q2-${taxYear}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
+                    <SelectItem value={`mtd-q3-${taxYear}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
+                    <SelectItem value={`mtd-q4-${taxYear}`}>MTD Q4 (6 Apr - 5 Apr)</SelectItem>
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

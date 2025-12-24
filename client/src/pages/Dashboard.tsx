@@ -79,6 +79,27 @@ export default function Dashboard() {
   const getDateRange = (filter: FilterState['dateRange']) => {
     const now = new Date();
     
+    // Handle MTD quarter format: 'mtd-q1-YYYY-YY'
+    if (filter.startsWith('mtd-q')) {
+      const match = filter.match(/mtd-q(\d)-(\d{4})-(\d{2})/);
+      if (match) {
+        const quarter = parseInt(match[1]);
+        const startYear = parseInt(match[2]);
+        const taxYearStart = new Date(startYear, 3, 6); // April 6
+        
+        // MTD quarters are cumulative from April 6
+        let endDate: Date;
+        switch (quarter) {
+          case 1: endDate = new Date(startYear, 6, 5, 23, 59, 59); break; // 5 July
+          case 2: endDate = new Date(startYear, 9, 5, 23, 59, 59); break; // 5 October
+          case 3: endDate = new Date(startYear + 1, 0, 5, 23, 59, 59); break; // 5 January
+          case 4: endDate = new Date(startYear + 1, 3, 5, 23, 59, 59); break; // 5 April
+          default: endDate = new Date(startYear + 1, 3, 5, 23, 59, 59);
+        }
+        return { start: taxYearStart, end: endDate };
+      }
+    }
+    
     // Handle dynamic tax year format: 'tax-year-YYYY-YY'
     if (filter.startsWith('tax-year-')) {
       const taxYearStr = filter.replace('tax-year-', '');

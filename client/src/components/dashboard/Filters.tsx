@@ -70,19 +70,30 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           value={filterState.dateRange} 
           onValueChange={(value) => onFilterChange({ dateRange: value as DateFilter })}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="this-month">This Month</SelectItem>
-            <SelectItem value="last-month">Last Month</SelectItem>
-            <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-            {taxYears.map((taxYear) => (
-              <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>
-                Tax Year {taxYear}
-              </SelectItem>
-            ))}
-            <SelectItem value="custom">Custom Date</SelectItem>
+          <SelectContent className="max-h-[400px]">
+            <SelectGroup>
+              <SelectLabel>Quick Filters</SelectLabel>
+              <SelectItem value="this-month">This Month</SelectItem>
+              <SelectItem value="last-month">Last Month</SelectItem>
+              <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+              <SelectItem value="custom">Custom Date</SelectItem>
+            </SelectGroup>
+            {taxYears.map((taxYear) => {
+              const startYear = parseInt(taxYear.split('-')[0]);
+              return (
+                <SelectGroup key={taxYear}>
+                  <SelectLabel>Tax Year {taxYear}</SelectLabel>
+                  <SelectItem value={`tax-year-${taxYear}`}>Full Year (6 Apr - 5 Apr)</SelectItem>
+                  <SelectItem value={`mtd-q1-${taxYear}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
+                  <SelectItem value={`mtd-q2-${taxYear}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
+                  <SelectItem value={`mtd-q3-${taxYear}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
+                  <SelectItem value={`mtd-q4-${taxYear}`}>MTD Q4 (6 Apr - 5 Apr)</SelectItem>
+                </SelectGroup>
+              );
+            })}
           </SelectContent>
         </Select>
 
