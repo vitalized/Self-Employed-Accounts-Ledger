@@ -235,7 +235,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     .slice(0, 6);
 
   const getCardClasses = (tab: TabType, baseColor: string, borderColor: string, forDesktop: boolean = false) => {
-    const isActive = activeTab === tab || pendingTab === tab;
+    const isActive = activeTab === tab || pendingTab === tab || (isClosing && displayedTab === tab);
     if (isActive) {
       if (forDesktop) {
         return cn(
@@ -631,7 +631,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
               </p>
             </CardContent>
           </Card>
-          <AnimatedPanel isActive={activeTab === 'profit'}>
+          <AnimatedPanel isActive={activeTab === 'profit'} onCollapseEnd={handleCollapseEnd}>
             <ProfitContent />
           </AnimatedPanel>
         </div>
@@ -657,7 +657,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
               </p>
             </CardContent>
           </Card>
-          <AnimatedPanel isActive={activeTab === 'income'}>
+          <AnimatedPanel isActive={activeTab === 'income'} onCollapseEnd={handleCollapseEnd}>
             <IncomeContent />
           </AnimatedPanel>
         </div>
@@ -683,7 +683,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
               </p>
             </CardContent>
           </Card>
-          <AnimatedPanel isActive={activeTab === 'expenses'}>
+          <AnimatedPanel isActive={activeTab === 'expenses'} onCollapseEnd={handleCollapseEnd}>
             <ExpensesContent />
           </AnimatedPanel>
         </div>
@@ -709,7 +709,7 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
               </p>
             </CardContent>
           </Card>
-          <AnimatedPanel isActive={activeTab === 'tax'}>
+          <AnimatedPanel isActive={activeTab === 'tax'} onCollapseEnd={handleCollapseEnd}>
             <TaxContent />
           </AnimatedPanel>
         </div>
