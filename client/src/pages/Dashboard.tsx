@@ -208,6 +208,15 @@ export default function Dashboard() {
     });
   }, [clearedTransactions, filters, dateRange]);
 
+  // Count unreviewed transactions in current date range
+  const unreviewedCount = useMemo(() => {
+    return clearedTransactions.filter(t => {
+      const tDate = parseISO(t.date);
+      if (!isWithinInterval(tDate, dateRange)) return false;
+      return t.type === 'Unreviewed' || (t.type === 'Business' && !t.category);
+    }).length;
+  }, [clearedTransactions, dateRange]);
+
   const handleTransactionUpdate = async (id: string, updates: Partial<Transaction>) => {
     try {
       await updateTransactionMutation.mutateAsync({ id, updates });
@@ -445,6 +454,7 @@ export default function Dashboard() {
             onExport={handleExport}
             availableCategories={availableCategories}
             isSyncing={isSyncing}
+            unreviewedCount={unreviewedCount}
           />
 
            <TransactionList 

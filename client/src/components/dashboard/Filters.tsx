@@ -35,9 +35,10 @@ interface FiltersProps {
   onExport: (type: ExportType) => void;
   availableCategories: string[];
   isSyncing?: boolean;
+  unreviewedCount?: number;
 }
 
-export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories, isSyncing = false }: FiltersProps) {
+export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories, isSyncing = false, unreviewedCount = 0 }: FiltersProps) {
   const { data: taxYears = [] } = useQuery<string[]>({
     queryKey: ["/api/tax-years"],
     queryFn: async () => {
@@ -193,6 +194,16 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
         >
           <AlertCircle className="mr-1.5 h-3.5 w-3.5" />
           Needs Review
+          {unreviewedCount > 0 && (
+            <span className={cn(
+              "ml-1.5 px-1.5 py-0.5 text-xs rounded-full min-w-[20px] text-center",
+              filterState.type === 'Unreviewed'
+                ? "bg-white/20 text-white"
+                : "bg-amber-100 text-amber-700"
+            )}>
+              {unreviewedCount}
+            </span>
+          )}
         </Button>
 
         <div className="h-4 w-px bg-border" />
