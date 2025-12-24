@@ -637,6 +637,21 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
             </CardContent>
           </Card>
 
+          {/* Tax Summary Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax Summary</CardTitle>
+              <CardDescription>Estimated tax liability for this tax year</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IncomeRow label="Net Profit (Box 47)" value={data.netProfit} />
+              <IncomeRow label="Less: Income Tax" value={data.tax.incomeTax} />
+              <IncomeRow label="Less: National Insurance (Class 2 + Class 4)" value={data.tax.class4NI + data.tax.class2NI} />
+              <IncomeRow label="TOTAL TAX DUE" value={data.tax.total} isTotal />
+              <IncomeRow label="TAKE HOME" value={data.netProfit - data.tax.total} isTotal />
+            </CardContent>
+          </Card>
+
           {/* Mileage Allowance Card */}
           {mileageSummary && mileageSummary.totalMiles > 0 && (
             <Card className="border-blue-200 dark:border-blue-800">
@@ -733,21 +748,6 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
               </CardContent>
             </Card>
           )}
-
-          {/* Tax Summary Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Tax Summary</CardTitle>
-              <CardDescription>Estimated tax liability for this tax year</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <IncomeRow label="Net Profit (Box 47)" value={data.netProfit} />
-              <IncomeRow label="Less: Income Tax" value={data.tax.incomeTax} />
-              <IncomeRow label="Less: National Insurance (Class 2 + Class 4)" value={data.tax.class4NI + data.tax.class2NI} />
-              <IncomeRow label="TOTAL TAX DUE" value={data.tax.total} isTotal />
-              <IncomeRow label="TAKE HOME" value={data.netProfit - data.tax.total} isTotal />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="tax" className="mt-6 space-y-6">
