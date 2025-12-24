@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Transaction } from "@/lib/types";
 import { format, differenceInDays, differenceInCalendarMonths, isBefore, isAfter, addMonths, startOfMonth, endOfMonth } from "date-fns";
-import { Calculator, PiggyBank, Calendar, AlertCircle, TrendingUp, Wallet, Download, FileSpreadsheet, Info } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend, Cell } from "recharts";
+import { Calculator, PiggyBank, Calendar, AlertCircle, Wallet, Download, FileSpreadsheet, Info } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Cell } from "recharts";
 import * as XLSX from 'xlsx';
 import { useQuery } from "@tanstack/react-query";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
@@ -639,37 +639,6 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
               <div className="w-3 h-3 rounded bg-orange-500" />
               <span>Deadline month</span>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Cumulative Savings Progress
-          </CardTitle>
-          <CardDescription>
-            Track your total savings against the tax due
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyBreakdown}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`} />
-                <Tooltip 
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, '']}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-                <Legend />
-                <ReferenceLine y={paymentSchedule.jan31Total} stroke="#ef4444" strokeDasharray="5 5" label={{ value: `Jan 31: £${(paymentSchedule.jan31Total / 1000).toFixed(0)}k`, fill: '#ef4444', fontSize: 11 }} />
-                <ReferenceLine y={paymentSchedule.totalOwed} stroke="#f97316" strokeDasharray="5 5" label={{ value: `Total: £${(paymentSchedule.totalOwed / 1000).toFixed(0)}k`, fill: '#f97316', fontSize: 11 }} />
-                <Area type="monotone" dataKey="accumulated" name="Your Savings" fill="#22c55e" stroke="#16a34a" fillOpacity={0.6} />
-              </AreaChart>
-            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
