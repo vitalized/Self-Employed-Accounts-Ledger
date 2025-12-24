@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Transaction } from "@/lib/types";
 import { format, differenceInDays, differenceInCalendarMonths, isBefore, isAfter, addMonths, startOfMonth, endOfMonth } from "date-fns";
-import { Calculator, PiggyBank, Calendar, AlertCircle, Wallet, Download, FileSpreadsheet, Info } from "lucide-react";
+import { Calculator, PiggyBank, Calendar, AlertCircle, TrendingUp, Wallet, Download, FileSpreadsheet, Info } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Cell } from "recharts";
 import * as XLSX from 'xlsx';
 import { useQuery } from "@tanstack/react-query";
