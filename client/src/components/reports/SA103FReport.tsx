@@ -147,6 +147,10 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       }
     });
 
+    // Add Use of Home allowance to Box 21 (Rent, rates, power and insurance costs)
+    const useOfHomeAmount = useOfHomeData?.recommendedAmount || 0;
+    expenses.rent += useOfHomeAmount;
+
     const totalIncome = turnover + otherIncome;
     const totalExpenses = Object.values(expenses).reduce((a, b) => a + b, 0);
     const totalDisallowable = Object.values(disallowable).reduce((a, b) => a + b, 0);
@@ -217,7 +221,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
         total: Math.round(incomeTax + class4NI + class2NI)
       }
     };
-  }, [transactions]);
+  }, [transactions, useOfHomeData]);
 
   const monthlyData = useMemo(() => {
     const months: Record<string, { name: string, income: number, expenses: number, profit: number }> = {};
@@ -258,7 +262,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       ['Construction industry - payments to subcontractors', data.expenses.construction, '18', 0, '33'],
       ['Wages, salaries and other staff costs', data.expenses.wages, '19', 0, '34'],
       ['Car, van and travel expenses', data.expenses.travel, '20', data.disallowable.travel, '35'],
-      ['Rent, rates, power and insurance costs', data.expenses.rent, '21', 0, '36'],
+      [useOfHomeData && useOfHomeData.recommendedAmount > 0 ? 'Rent, rates, power and insurance costs (incl. Use of Home)' : 'Rent, rates, power and insurance costs', data.expenses.rent, '21', 0, '36'],
       ['Repairs and renewals of property and equipment', data.expenses.repairs, '22', 0, '37'],
       ['Phone, fax, stationery and other office costs', data.expenses.admin, '23', 0, '38'],
       ['Advertising and business entertainment costs', data.expenses.advertising, '24', data.disallowable.advertising, '39'],
@@ -291,8 +295,8 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
 
     if (useOfHomeData && useOfHomeData.recommendedAmount > 0) {
       rows.push(['', '', '', '', '']);
-      rows.push(['USE OF HOME ALLOWANCE', '', '', '', '']);
-      rows.push(['(Business portion of household expenses)', '', '', '', '']);
+      rows.push(['USE OF HOME ALLOWANCE (included in Box 21 above)', '', '', '', '']);
+      rows.push(['(Business portion of household expenses - breakdown for reference)', '', '', '', '']);
       rows.push([`Calculation method used`, useOfHomeData.recommended === 'proportional' ? 'Proportional (room-based)' : 'HMRC Flat Rate (hours-based)', '', '', '']);
       if (useOfHomeData.recommended === 'proportional') {
         rows.push(['Total household expenses', useOfHomeData.totalExpenses, '', '', '']);
@@ -301,7 +305,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
         rows.push(['Hours worked from home per week', useOfHomeData.hoursPerWeek, 'hours', '', '']);
         rows.push([`Monthly flat rate (${useOfHomeData.hoursPerMonth} hrs/month)`, useOfHomeData.monthlyFlatRate, '', '', '']);
       }
-      rows.push(['TOTAL USE OF HOME ALLOWANCE', useOfHomeData.recommendedAmount.toFixed(0), '', '', '']);
+      rows.push(['USE OF HOME AMOUNT (in Box 21)', useOfHomeData.recommendedAmount.toFixed(0), '', '', '']);
     }
 
     rows.push(['', '', '', '', '']);
@@ -388,8 +392,8 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       ` : '';
 
       const useOfHomeSection = useOfHomeData && useOfHomeData.recommendedAmount > 0 ? `
-          <h3>Use of Home Allowance</h3>
-          <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Business portion of household expenses</p>
+          <h3>Use of Home Allowance (included in Box 21)</h3>
+          <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Business portion of household expenses - breakdown for reference</p>
           <table>
             <tr><td>Calculation method</td><td class="amount">${useOfHomeData.recommended === 'proportional' ? 'Proportional (room-based)' : 'HMRC Flat Rate (hours-based)'}</td></tr>
             ${useOfHomeData.recommended === 'proportional' ? `
@@ -399,7 +403,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
               <tr><td>Hours worked from home per week</td><td class="amount">${useOfHomeData.hoursPerWeek} hours</td></tr>
               <tr><td>Monthly flat rate (${useOfHomeData.hoursPerMonth} hrs/month)</td><td class="amount">£${useOfHomeData.monthlyFlatRate}</td></tr>
             `}
-            <tr class="total"><td>TOTAL USE OF HOME ALLOWANCE</td><td class="amount">£${Math.round(useOfHomeData.recommendedAmount).toLocaleString()}</td></tr>
+            <tr class="total"><td>USE OF HOME AMOUNT (in Box 21)</td><td class="amount">£${Math.round(useOfHomeData.recommendedAmount).toLocaleString()}</td></tr>
           </table>
       ` : '';
 
@@ -449,7 +453,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
             <tr><td>Construction industry - payments to subcontractors</td><td class="amount">£${data.expenses.construction.toLocaleString()}</td><td class="box">18</td><td class="amount">£0</td><td class="box">33</td></tr>
             <tr><td>Wages, salaries and other staff costs</td><td class="amount">£${data.expenses.wages.toLocaleString()}</td><td class="box">19</td><td class="amount">£0</td><td class="box">34</td></tr>
             <tr><td>Car, van and travel expenses</td><td class="amount">£${data.expenses.travel.toLocaleString()}</td><td class="box">20</td><td class="amount">£${data.disallowable.travel.toLocaleString()}</td><td class="box">35</td></tr>
-            <tr><td>Rent, rates, power and insurance costs</td><td class="amount">£${data.expenses.rent.toLocaleString()}</td><td class="box">21</td><td class="amount">£0</td><td class="box">36</td></tr>
+            <tr><td>Rent, rates, power and insurance costs${useOfHomeData && useOfHomeData.recommendedAmount > 0 ? ' (incl. Use of Home)' : ''}</td><td class="amount">£${data.expenses.rent.toLocaleString()}</td><td class="box">21</td><td class="amount">£0</td><td class="box">36</td></tr>
             <tr><td>Repairs and renewals of property and equipment</td><td class="amount">£${data.expenses.repairs.toLocaleString()}</td><td class="box">22</td><td class="amount">£0</td><td class="box">37</td></tr>
             <tr><td>Phone, fax, stationery and other office costs</td><td class="amount">£${data.expenses.admin.toLocaleString()}</td><td class="box">23</td><td class="amount">£0</td><td class="box">38</td></tr>
             <tr><td>Advertising and business entertainment costs</td><td class="amount">£${data.expenses.advertising.toLocaleString()}</td><td class="box">24</td><td class="amount">£${data.disallowable.advertising.toLocaleString()}</td><td class="box">39</td></tr>
@@ -606,7 +610,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
                 <Row label="Construction industry - payments to subcontractors" valAllowable={data.expenses.construction} boxAllowable="18" valDisallowable={0} boxDisallowable="33" />
                 <Row label="Wages, salaries and other staff costs" valAllowable={data.expenses.wages} boxAllowable="19" valDisallowable={0} boxDisallowable="34" />
                 <Row label="Car, van and travel expenses" valAllowable={data.expenses.travel} boxAllowable="20" valDisallowable={data.disallowable.travel} boxDisallowable="35" />
-                <Row label="Rent, rates, power and insurance costs" valAllowable={data.expenses.rent} boxAllowable="21" valDisallowable={0} boxDisallowable="36" />
+                <Row label={useOfHomeData && useOfHomeData.recommendedAmount > 0 ? "Rent, rates, power and insurance costs (incl. Use of Home)" : "Rent, rates, power and insurance costs"} valAllowable={data.expenses.rent} boxAllowable="21" valDisallowable={0} boxDisallowable="36" />
                 <Row label="Repairs and renewals of property and equipment" valAllowable={data.expenses.repairs} boxAllowable="22" valDisallowable={0} boxDisallowable="37" />
                 <Row label="Phone, fax, stationery and other office costs" valAllowable={data.expenses.admin} boxAllowable="23" valDisallowable={0} boxDisallowable="38" />
                 <Row label="Advertising and business entertainment costs" valAllowable={data.expenses.advertising} boxAllowable="24" valDisallowable={data.disallowable.advertising} boxDisallowable="39" />
@@ -684,7 +688,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
                   <Home className="h-5 w-5 text-green-600" />
                   Use of Home Allowance
                 </CardTitle>
-                <CardDescription>Business portion of household expenses</CardDescription>
+                <CardDescription>Included in Box 21 above (Rent, rates, power and insurance costs)</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -718,11 +722,11 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
                     </>
                   )}
                   <div className="flex justify-between py-3 font-bold text-lg border-t-2">
-                    <span>Total Use of Home Allowance</span>
+                    <span>Use of Home Amount</span>
                     <span className="text-green-600">£{Math.round(useOfHomeData.recommendedAmount).toLocaleString()}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    This is the recommended calculation from your Use of Home settings. 
+                    This amount is already included in Box 21 expenses above and reduces your taxable profit. 
                     Configure your expenses and usage in the Use of Home report tab.
                   </p>
                 </div>
