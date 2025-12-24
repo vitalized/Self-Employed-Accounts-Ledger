@@ -194,7 +194,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
   }, [transactions]);
 
   const getExportData = () => {
-    return [
+    const rows: (string | number)[][] = [
       ['SA103F Self-Assessment Summary', '', '', '', ''],
       [`Tax Year: ${yearLabel}`, '', '', '', ''],
       ['', '', '', '', ''],
@@ -222,15 +222,48 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       ['', '', '', '', ''],
       ['NET PROFIT OR LOSS', 'Amount', 'Box', '', ''],
       ['Total business income', data.totalIncome, '', '', ''],
-      ['Total allowable expenses', data.totalExpenses, '31', '', ''],
+      ['Less: Total allowable expenses', data.totalExpenses, '31', '', ''],
       ['NET PROFIT', data.netProfit, '47', '', ''],
-      ['', '', '', '', ''],
-      ['TAX CALCULATION', 'Amount', '', '', ''],
-      ['Income tax', data.tax.incomeTax, '', '', ''],
-      ['Class 4 National Insurance Contribution', data.tax.class4NI, '', '', ''],
-      ['Class 2 National Insurance Contribution', data.tax.class2NI, '', '', ''],
-      ['TOTAL TAX', data.tax.total, '', '', ''],
     ];
+
+    if (mileageSummary && mileageSummary.totalMiles > 0) {
+      rows.push(['', '', '', '', '']);
+      rows.push(['MILEAGE ALLOWANCE', '', '', '', '']);
+      rows.push(['(HMRC approved mileage rates - separate from vehicle expenses)', '', '', '', '']);
+      rows.push(['Total business miles driven', mileageSummary.totalMiles, 'miles', '', '']);
+      rows.push(['Number of trips recorded', mileageSummary.tripCount, 'trips', '', '']);
+      rows.push(['First 10,000 miles @ 45p/mile', Math.min(mileageSummary.totalMiles, 10000) * 0.45, '', '', '']);
+      if (mileageSummary.totalMiles > 10000) {
+        rows.push([`Additional miles @ 25p/mile (${mileageSummary.totalMiles - 10000} miles)`, (mileageSummary.totalMiles - 10000) * 0.25, '', '', '']);
+      }
+      rows.push(['TOTAL MILEAGE ALLOWANCE', mileageSummary.allowance, '', '', '']);
+    }
+
+    rows.push(['', '', '', '', '']);
+    rows.push(['INCOME TAX CALCULATION', '', '', '', '']);
+    rows.push(['Net Profit', data.netProfit, '', '', '']);
+    rows.push(['Personal Allowance', -12570, '', '', '']);
+    rows.push(['Taxable Income', data.taxableIncome, '', '', '']);
+    rows.push(['', '', '', '', '']);
+    rows.push(['Tax Band', 'Rate', 'Amount', 'Tax', '']);
+    data.taxBreakdown.forEach(band => {
+      rows.push([band.band, band.rate, band.amount, Math.round(band.tax), '']);
+    });
+    rows.push(['TOTAL INCOME TAX', '', '', data.tax.incomeTax, '']);
+    rows.push(['', '', '', '', '']);
+    rows.push(['NATIONAL INSURANCE', 'Description', 'Amount', '', '']);
+    rows.push(['Class 4 NI', '9% on profits £12,570-£50,270, 2% above', data.tax.class4NI, '', '']);
+    rows.push(['Class 2 NI', '£3.45/week if profits above £6,725', data.tax.class2NI, '', '']);
+    rows.push(['TOTAL NATIONAL INSURANCE', '', data.tax.class4NI + data.tax.class2NI, '', '']);
+    rows.push(['', '', '', '', '']);
+    rows.push(['SUMMARY', '', '', '', '']);
+    rows.push(['Net Profit', data.netProfit, '', '', '']);
+    rows.push(['Less: Income Tax', data.tax.incomeTax, '', '', '']);
+    rows.push(['Less: National Insurance', data.tax.class4NI + data.tax.class2NI, '', '', '']);
+    rows.push(['TOTAL TAX DUE', data.tax.total, '', '', '']);
+    rows.push(['TAKE HOME', data.netProfit - data.tax.total, '', '', '']);
+
+    return rows;
   };
 
   const exportToCSV = () => {
