@@ -9,6 +9,18 @@ import { PendingPaymentsTable } from "@/components/dashboard/PendingPaymentsTabl
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
 import { FilterState, Transaction } from "@/lib/types";
 import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format, isFuture, isAfter, startOfDay } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue,
+  SelectGroup,
+  SelectLabel,
+  SelectSeparator,
+} from "@/components/ui/select";
+import { DateFilter } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, useUpdateTransaction } from "@/lib/queries";
 import { useDataMode } from "@/lib/dataContext";
@@ -280,11 +292,48 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="flex flex-col space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Overview</h2>
-          <p className="text-muted-foreground">
-            Manage your business finances and track tax liability.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Overview</h2>
+            <p className="text-muted-foreground">
+              Manage your business finances and track tax liability.
+            </p>
+          </div>
+          
+          <Select 
+            value={filters.dateRange} 
+            onValueChange={(value) => setFilters(prev => ({ ...prev, dateRange: value as DateFilter }))}
+          >
+            <SelectTrigger className="w-[200px] h-9" data-testid="select-date-range-quick">
+              <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[400px]">
+              <SelectGroup>
+                <SelectLabel>Quick Filters</SelectLabel>
+                <SelectItem value="this-month">This Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+              </SelectGroup>
+              {taxYears.length > 0 && (
+                <>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Tax Year {taxYears[0]}</SelectLabel>
+                    <SelectItem value={`tax-year-${taxYears[0]}`}>Current Tax Year</SelectItem>
+                    <SelectItem value={`mtd-q1-${taxYears[0]}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
+                    <SelectItem value={`mtd-q2-${taxYears[0]}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
+                    <SelectItem value={`mtd-q3-${taxYears[0]}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
+                    <SelectItem value={`mtd-q4-${taxYears[0]}`}>MTD Q4 (6 Apr - 5 Apr)</SelectItem>
+                  </SelectGroup>
+                  <SelectSeparator />
+                </>
+              )}
+              {taxYears.slice(1).map((taxYear) => (
+                <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>Tax Year {taxYear}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <StatCards 
