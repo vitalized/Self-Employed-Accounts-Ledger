@@ -277,49 +277,122 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       const startYear = yearLabel.split('-')[0];
       const endYear = '20' + yearLabel.split('-')[1];
       
+      const mileageSection = mileageSummary && mileageSummary.totalMiles > 0 ? `
+          <h3>Mileage Allowance</h3>
+          <p style="font-size: 12px; color: #666; margin-bottom: 10px;">HMRC approved mileage rates (separate from vehicle expenses)</p>
+          <table>
+            <tr><td>Total business miles driven</td><td class="amount">${mileageSummary.totalMiles.toLocaleString()} miles</td></tr>
+            <tr><td>Number of trips recorded</td><td class="amount">${mileageSummary.tripCount} trips</td></tr>
+            <tr><td>First 10,000 miles @ 45p/mile</td><td class="amount">£${(Math.min(mileageSummary.totalMiles, 10000) * 0.45).toFixed(2)}</td></tr>
+            ${mileageSummary.totalMiles > 10000 ? `<tr><td>Additional miles @ 25p/mile (${(mileageSummary.totalMiles - 10000).toLocaleString()} miles)</td><td class="amount">£${((mileageSummary.totalMiles - 10000) * 0.25).toFixed(2)}</td></tr>` : ''}
+            <tr class="total"><td>TOTAL MILEAGE ALLOWANCE</td><td class="amount">£${mileageSummary.allowance.toLocaleString()}</td></tr>
+          </table>
+      ` : '';
+
+      const taxBreakdownRows = data.taxBreakdown.map(band => 
+        `<tr><td>${band.band} (${band.rate}) on £${band.amount.toLocaleString()}</td><td class="amount">£${Math.round(band.tax).toLocaleString()}</td></tr>`
+      ).join('');
+      
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
           <title>SA103F Self-Assessment ${yearLabel}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
-            h1 { font-size: 24px; margin-bottom: 5px; }
-            h2 { font-size: 14px; color: #666; margin-bottom: 20px; }
-            h3 { font-size: 16px; margin-top: 30px; margin-bottom: 15px; color: #333; }
-            .period { text-align: right; color: #666; font-size: 12px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { padding: 8px; text-align: left; border-bottom: 1px dashed #ddd; font-size: 13px; }
+            body { font-family: Arial, sans-serif; padding: 40px; max-width: 900px; margin: 0 auto; font-size: 12px; }
+            h1 { font-size: 22px; margin-bottom: 5px; }
+            h2 { font-size: 13px; color: #666; margin-bottom: 20px; }
+            h3 { font-size: 15px; margin-top: 25px; margin-bottom: 12px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+            .period { text-align: right; color: #666; font-size: 11px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            th, td { padding: 6px 8px; text-align: left; border-bottom: 1px dashed #ddd; font-size: 12px; }
+            th { background: #f5f5f5; font-weight: bold; border-bottom: 1px solid #333; }
             .amount { text-align: right; }
-            .total td { border-bottom: 2px solid #333; border-top: 1px solid #333; font-weight: bold; }
-            @media print { body { padding: 20px; } }
+            .box { text-align: center; font-size: 10px; color: #666; width: 40px; }
+            .total td { border-bottom: 2px solid #333; border-top: 1px solid #333; font-weight: bold; background: #f9f9f9; }
+            .section-note { font-size: 11px; color: #666; margin-bottom: 10px; }
+            .page-break { page-break-before: always; }
+            @media print { body { padding: 15px; } h3 { page-break-after: avoid; } table { page-break-inside: avoid; } }
           </style>
         </head>
         <body>
           <h1>Self-Assessment Summary ${yearLabel}</h1>
           <h2>Based on SA103F categories</h2>
-          <div class="period">6 April ${startYear} - 5 April ${endYear}</div>
-          <h3>Business income</h3>
+          <div class="period">Tax Year: 6 April ${startYear} - 5 April ${endYear}</div>
+          
+          <h3>Business Income (Boxes 15-16)</h3>
           <table>
-            <tr><td>Your turnover</td><td class="amount">£${data.turnover.toLocaleString()}</td></tr>
-            <tr><td>Other business income</td><td class="amount">£${data.otherIncome.toLocaleString()}</td></tr>
-            <tr class="total"><td>TOTAL</td><td class="amount">£${data.totalIncome.toLocaleString()}</td></tr>
+            <tr><th>Description</th><th class="amount">Amount</th><th class="box">Box</th></tr>
+            <tr><td>Your turnover - the takings, fees, sales or money earned by your business</td><td class="amount">£${data.turnover.toLocaleString()}</td><td class="box">15</td></tr>
+            <tr><td>Any other business income not included in box 15</td><td class="amount">£${data.otherIncome.toLocaleString()}</td><td class="box">16</td></tr>
+            <tr class="total"><td>TOTAL BUSINESS INCOME</td><td class="amount">£${data.totalIncome.toLocaleString()}</td><td class="box"></td></tr>
           </table>
-          <h3>Business expenses</h3>
+
+          <h3>Business Expenses (Boxes 17-31 Allowable, 32-46 Disallowable)</h3>
           <table>
-            <tr><td>Total allowable expenses</td><td class="amount">£${data.totalExpenses.toLocaleString()}</td></tr>
+            <tr><th>Description</th><th class="amount">Allowable</th><th class="box">Box</th><th class="amount">Disallowable</th><th class="box">Box</th></tr>
+            <tr><td>Cost of goods bought for resale or goods used</td><td class="amount">£${data.expenses.costOfGoods.toLocaleString()}</td><td class="box">17</td><td class="amount">£0</td><td class="box">32</td></tr>
+            <tr><td>Construction industry - payments to subcontractors</td><td class="amount">£${data.expenses.construction.toLocaleString()}</td><td class="box">18</td><td class="amount">£0</td><td class="box">33</td></tr>
+            <tr><td>Wages, salaries and other staff costs</td><td class="amount">£${data.expenses.wages.toLocaleString()}</td><td class="box">19</td><td class="amount">£0</td><td class="box">34</td></tr>
+            <tr><td>Car, van and travel expenses</td><td class="amount">£${data.expenses.travel.toLocaleString()}</td><td class="box">20</td><td class="amount">£${data.disallowable.travel.toLocaleString()}</td><td class="box">35</td></tr>
+            <tr><td>Rent, rates, power and insurance costs</td><td class="amount">£${data.expenses.rent.toLocaleString()}</td><td class="box">21</td><td class="amount">£0</td><td class="box">36</td></tr>
+            <tr><td>Repairs and renewals of property and equipment</td><td class="amount">£${data.expenses.repairs.toLocaleString()}</td><td class="box">22</td><td class="amount">£0</td><td class="box">37</td></tr>
+            <tr><td>Phone, fax, stationery and other office costs</td><td class="amount">£${data.expenses.admin.toLocaleString()}</td><td class="box">23</td><td class="amount">£0</td><td class="box">38</td></tr>
+            <tr><td>Advertising and business entertainment costs</td><td class="amount">£${data.expenses.advertising.toLocaleString()}</td><td class="box">24</td><td class="amount">£${data.disallowable.advertising.toLocaleString()}</td><td class="box">39</td></tr>
+            <tr><td>Interest on bank and other loans</td><td class="amount">£${data.expenses.interest.toLocaleString()}</td><td class="box">25</td><td class="amount">£0</td><td class="box">40</td></tr>
+            <tr><td>Bank, credit card and other financial charges</td><td class="amount">£${data.expenses.bankCharges.toLocaleString()}</td><td class="box">26</td><td class="amount">£0</td><td class="box">41</td></tr>
+            <tr><td>Irrecoverable debts written off</td><td class="amount">£${data.expenses.badDebts.toLocaleString()}</td><td class="box">27</td><td class="amount">£0</td><td class="box">42</td></tr>
+            <tr><td>Accountancy, legal and other professional fees</td><td class="amount">£${data.expenses.professional.toLocaleString()}</td><td class="box">28</td><td class="amount">£0</td><td class="box">43</td></tr>
+            <tr><td>Depreciation and loss/profit on sale of assets</td><td class="amount">£${data.expenses.depreciation.toLocaleString()}</td><td class="box">29</td><td class="amount">£0</td><td class="box">44</td></tr>
+            <tr><td>Other business expenses</td><td class="amount">£${data.expenses.other.toLocaleString()}</td><td class="box">30</td><td class="amount">£${data.disallowable.other.toLocaleString()}</td><td class="box">45</td></tr>
+            <tr class="total"><td>TOTAL EXPENSES</td><td class="amount">£${data.totalExpenses.toLocaleString()}</td><td class="box">31</td><td class="amount">£${data.totalDisallowable.toLocaleString()}</td><td class="box">46</td></tr>
           </table>
-          <h3>Net profit</h3>
+
+          <h3>Net Profit or Loss (Box 47)</h3>
           <table>
-            <tr class="total"><td>NET PROFIT</td><td class="amount">£${data.netProfit.toLocaleString()}</td></tr>
+            <tr><td>Total business income</td><td class="amount">£${data.totalIncome.toLocaleString()}</td><td class="box"></td></tr>
+            <tr><td>Less: Total allowable expenses</td><td class="amount">-£${data.totalExpenses.toLocaleString()}</td><td class="box">31</td></tr>
+            <tr class="total"><td>NET PROFIT</td><td class="amount">£${data.netProfit.toLocaleString()}</td><td class="box">47</td></tr>
           </table>
-          <h3>Tax estimate</h3>
+
+          ${mileageSection}
+
+          <div class="page-break"></div>
+          
+          <h3>Income Tax Calculation</h3>
+          <p class="section-note">UK income tax calculation based on current rates</p>
           <table>
-            <tr><td>Income tax</td><td class="amount">£${data.tax.incomeTax.toLocaleString()}</td></tr>
-            <tr><td>Class 4 NI</td><td class="amount">£${data.tax.class4NI.toLocaleString()}</td></tr>
-            <tr><td>Class 2 NI</td><td class="amount">£${data.tax.class2NI.toLocaleString()}</td></tr>
-            <tr class="total"><td>TOTAL TAX</td><td class="amount">£${data.tax.total.toLocaleString()}</td></tr>
+            <tr><td>Net Profit</td><td class="amount">£${data.netProfit.toLocaleString()}</td></tr>
+            <tr><td>Personal Allowance</td><td class="amount" style="color: green;">-£12,570</td></tr>
+            <tr style="font-weight: bold;"><td>Taxable Income</td><td class="amount">£${data.taxableIncome.toLocaleString()}</td></tr>
           </table>
+          <table>
+            <tr><th>Tax Band</th><th class="amount">Tax</th></tr>
+            ${taxBreakdownRows}
+            <tr class="total"><td>TOTAL INCOME TAX</td><td class="amount">£${data.tax.incomeTax.toLocaleString()}</td></tr>
+          </table>
+
+          <h3>National Insurance Contributions</h3>
+          <p class="section-note">Self-employed NI contributions</p>
+          <table>
+            <tr><th>Type</th><th>Description</th><th class="amount">Amount</th></tr>
+            <tr><td>Class 4 NI</td><td>9% on profits between £12,570 and £50,270, 2% above</td><td class="amount">£${data.tax.class4NI.toLocaleString()}</td></tr>
+            <tr><td>Class 2 NI</td><td>£3.45/week if profits above £6,725</td><td class="amount">£${data.tax.class2NI.toLocaleString()}</td></tr>
+            <tr class="total"><td colspan="2">TOTAL NATIONAL INSURANCE</td><td class="amount">£${(data.tax.class4NI + data.tax.class2NI).toLocaleString()}</td></tr>
+          </table>
+
+          <h3>Summary</h3>
+          <table>
+            <tr><td>Net Profit</td><td class="amount">£${data.netProfit.toLocaleString()}</td></tr>
+            <tr><td>Income Tax</td><td class="amount" style="color: #c75000;">-£${data.tax.incomeTax.toLocaleString()}</td></tr>
+            <tr><td>National Insurance</td><td class="amount" style="color: #c75000;">-£${(data.tax.class4NI + data.tax.class2NI).toLocaleString()}</td></tr>
+            <tr class="total"><td>TOTAL TAX DUE</td><td class="amount" style="color: #c75000;">£${data.tax.total.toLocaleString()}</td></tr>
+            <tr class="total"><td>TAKE HOME</td><td class="amount" style="color: green;">£${(data.netProfit - data.tax.total).toLocaleString()}</td></tr>
+          </table>
+
+          <p style="margin-top: 30px; font-size: 10px; color: #999; text-align: center;">
+            Generated by TaxTrack on ${new Date().toLocaleDateString('en-GB')} | This is an estimate only - consult a qualified accountant for tax advice
+          </p>
         </body>
         </html>
       `);
