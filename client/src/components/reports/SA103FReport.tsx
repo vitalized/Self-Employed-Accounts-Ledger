@@ -735,29 +735,17 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
           )}
 
           {/* Tax Summary Card */}
-          <Card className="bg-gradient-to-r from-orange-50 to-green-50 dark:from-orange-950/30 dark:to-green-950/30 border-orange-200 dark:border-orange-800">
+          <Card>
             <CardHeader>
               <CardTitle>Tax Summary</CardTitle>
               <CardDescription>Estimated tax liability for this tax year</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="text-center p-4 bg-white/50 dark:bg-gray-900/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Net Profit</p>
-                  <p className="text-2xl font-bold">£{data.netProfit.toLocaleString()}</p>
-                </div>
-                <div className="text-center p-4 bg-white/50 dark:bg-gray-900/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Total Tax Due</p>
-                  <p className="text-2xl font-bold text-orange-600">£{data.tax.total.toLocaleString()}</p>
-                </div>
-                <div className="text-center p-4 bg-white/50 dark:bg-gray-900/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Take Home</p>
-                  <p className="text-2xl font-bold text-green-600">£{(data.netProfit - data.tax.total).toLocaleString()}</p>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-4 text-center">
-                See the Tax tab for full breakdown including Income Tax and National Insurance
-              </p>
+              <IncomeRow label="Net Profit (Box 47)" value={data.netProfit} />
+              <IncomeRow label="Less: Income Tax" value={data.tax.incomeTax} />
+              <IncomeRow label="Less: National Insurance (Class 2 + Class 4)" value={data.tax.class4NI + data.tax.class2NI} />
+              <IncomeRow label="TOTAL TAX DUE" value={data.tax.total} isTotal />
+              <IncomeRow label="TAKE HOME" value={data.netProfit - data.tax.total} isTotal />
             </CardContent>
           </Card>
         </TabsContent>
