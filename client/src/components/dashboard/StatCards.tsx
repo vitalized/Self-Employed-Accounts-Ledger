@@ -256,8 +256,8 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     if (!isDesktop) return "rounded-xl";
     const effectiveTab = isClosing ? displayedTab : tab;
     switch (effectiveTab) {
-      case 'profit': return "rounded-tr-xl rounded-b-xl";
-      case 'tax': return "rounded-tl-xl rounded-b-xl";
+      case 'profit': return "rounded-tl-none rounded-tr-xl rounded-b-xl";
+      case 'tax': return "rounded-tr-none rounded-tl-xl rounded-b-xl";
       default: return "rounded-xl";
     }
   };
