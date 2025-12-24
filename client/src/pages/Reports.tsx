@@ -12,6 +12,7 @@ import { ProfitLossReport } from "@/components/reports/ProfitLossReport";
 import { ExpenseBreakdownReport } from "@/components/reports/ExpenseBreakdownReport";
 import { TaxCalculatorReport } from "@/components/reports/TaxCalculatorReport";
 import { VATSummaryReport } from "@/components/reports/VATSummaryReport";
+import { MileageReport } from "@/components/reports/MileageReport";
 import { Calendar } from "lucide-react";
 
 const REPORT_TITLES: Record<string, { title: string; getDescription: (yearLabel: string) => string }> = {
@@ -20,6 +21,7 @@ const REPORT_TITLES: Record<string, { title: string; getDescription: (yearLabel:
   'expenses': { title: 'Expense Breakdown', getDescription: (y) => `Tax Year ${y}` },
   'tax-calculator': { title: 'Tax Calculator', getDescription: (y) => `UK Income Tax & National Insurance (Tax Year ${y})` },
   'vat': { title: 'VAT Summary', getDescription: (y) => `VAT threshold tracking (Tax Year ${y})` },
+  'mileage': { title: 'Mileage Report', getDescription: (y) => `Business mileage allowance tracker (Tax Year ${y})` },
 };
 
 export default function Reports() {
@@ -146,6 +148,8 @@ export default function Reports() {
         return <TaxCalculatorReport transactions={filteredTransactions} yearLabel={yearLabel} />;
       case 'vat':
         return <VATSummaryReport transactions={filteredTransactions} yearLabel={yearLabel} />;
+      case 'mileage':
+        return <MileageReport yearLabel={yearLabel} />;
       default:
         return <SA103FReport transactions={filteredTransactions} yearLabel={yearLabel} />;
     }
