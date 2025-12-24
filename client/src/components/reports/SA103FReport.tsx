@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, FileText, Car } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Car, Home } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
 import * as XLSX from "xlsx";
@@ -34,6 +34,56 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       return res.json();
     },
   });
+
+  // Get Use of Home data from localStorage
+  const useOfHomeData = useMemo(() => {
+    const storageKey = `useOfHome_${yearLabel}`;
+    try {
+      const expensesRaw = localStorage.getItem(storageKey);
+      const totalRooms = parseInt(localStorage.getItem(`${storageKey}_rooms`) || '0') || 0;
+      const businessRooms = parseInt(localStorage.getItem(`${storageKey}_bizRooms`) || '0') || 0;
+      const hoursPerWeek = parseInt(localStorage.getItem(`${storageKey}_hours`) || '0') || 0;
+
+      if (!expensesRaw && totalRooms === 0 && hoursPerWeek === 0) {
+        return null;
+      }
+
+      const expenses = expensesRaw ? JSON.parse(expensesRaw) : {};
+      const totalExpenses = Object.values(expenses).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+      const roomProportion = totalRooms > 0 ? businessRooms / totalRooms : 0;
+      const proportionalClaim = totalExpenses * roomProportion;
+
+      const hoursPerMonth = hoursPerWeek * 4.33;
+      let monthlyFlatRate = 0;
+      if (hoursPerMonth >= 101) monthlyFlatRate = 26;
+      else if (hoursPerMonth >= 51) monthlyFlatRate = 18;
+      else if (hoursPerMonth >= 25) monthlyFlatRate = 10;
+      const annualFlatRate = monthlyFlatRate * 12;
+
+      const recommended = proportionalClaim > annualFlatRate ? 'proportional' : 'flat';
+      const recommendedAmount = recommended === 'proportional' ? proportionalClaim : annualFlatRate;
+
+      if (totalExpenses === 0 && hoursPerWeek === 0) {
+        return null;
+      }
+
+      return {
+        totalExpenses,
+        totalRooms,
+        businessRooms,
+        roomProportion: roomProportion * 100,
+        proportionalClaim,
+        hoursPerWeek,
+        hoursPerMonth: Math.round(hoursPerMonth),
+        monthlyFlatRate,
+        annualFlatRate,
+        recommended,
+        recommendedAmount
+      };
+    } catch {
+      return null;
+    }
+  }, [yearLabel]);
 
   const data = useMemo(() => {
     let turnover = 0;
@@ -239,6 +289,21 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
       rows.push(['TOTAL MILEAGE ALLOWANCE', mileageSummary.allowance, '', '', '']);
     }
 
+    if (useOfHomeData && useOfHomeData.recommendedAmount > 0) {
+      rows.push(['', '', '', '', '']);
+      rows.push(['USE OF HOME ALLOWANCE', '', '', '', '']);
+      rows.push(['(Business portion of household expenses)', '', '', '', '']);
+      rows.push([`Calculation method used`, useOfHomeData.recommended === 'proportional' ? 'Proportional (room-based)' : 'HMRC Flat Rate (hours-based)', '', '', '']);
+      if (useOfHomeData.recommended === 'proportional') {
+        rows.push(['Total household expenses', useOfHomeData.totalExpenses, '', '', '']);
+        rows.push([`Business rooms (${useOfHomeData.businessRooms}) / Total rooms (${useOfHomeData.totalRooms})`, `${useOfHomeData.roomProportion.toFixed(1)}%`, '', '', '']);
+      } else {
+        rows.push(['Hours worked from home per week', useOfHomeData.hoursPerWeek, 'hours', '', '']);
+        rows.push([`Monthly flat rate (${useOfHomeData.hoursPerMonth} hrs/month)`, useOfHomeData.monthlyFlatRate, '', '', '']);
+      }
+      rows.push(['TOTAL USE OF HOME ALLOWANCE', useOfHomeData.recommendedAmount.toFixed(0), '', '', '']);
+    }
+
     rows.push(['', '', '', '', '']);
     rows.push(['INCOME TAX CALCULATION', '', '', '', '']);
     rows.push(['Net Profit', data.netProfit, '', '', '']);
@@ -322,6 +387,22 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
           </table>
       ` : '';
 
+      const useOfHomeSection = useOfHomeData && useOfHomeData.recommendedAmount > 0 ? `
+          <h3>Use of Home Allowance</h3>
+          <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Business portion of household expenses</p>
+          <table>
+            <tr><td>Calculation method</td><td class="amount">${useOfHomeData.recommended === 'proportional' ? 'Proportional (room-based)' : 'HMRC Flat Rate (hours-based)'}</td></tr>
+            ${useOfHomeData.recommended === 'proportional' ? `
+              <tr><td>Total household expenses</td><td class="amount">£${useOfHomeData.totalExpenses.toLocaleString()}</td></tr>
+              <tr><td>Business rooms (${useOfHomeData.businessRooms}) / Total rooms (${useOfHomeData.totalRooms})</td><td class="amount">${useOfHomeData.roomProportion.toFixed(1)}%</td></tr>
+            ` : `
+              <tr><td>Hours worked from home per week</td><td class="amount">${useOfHomeData.hoursPerWeek} hours</td></tr>
+              <tr><td>Monthly flat rate (${useOfHomeData.hoursPerMonth} hrs/month)</td><td class="amount">£${useOfHomeData.monthlyFlatRate}</td></tr>
+            `}
+            <tr class="total"><td>TOTAL USE OF HOME ALLOWANCE</td><td class="amount">£${Math.round(useOfHomeData.recommendedAmount).toLocaleString()}</td></tr>
+          </table>
+      ` : '';
+
       const taxBreakdownRows = data.taxBreakdown.map(band => 
         `<tr><td>${band.band} (${band.rate}) on £${band.amount.toLocaleString()}</td><td class="amount">£${Math.round(band.tax).toLocaleString()}</td></tr>`
       ).join('');
@@ -389,6 +470,8 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
           </table>
 
           ${mileageSection}
+
+          ${useOfHomeSection}
 
           <div class="page-break"></div>
           
@@ -587,6 +670,60 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
                   <p className="text-xs text-muted-foreground mt-2">
                     This is claimed separately on your tax return. Costs categorized as "Covered by Mileage Allowance" 
                     are not included in expenses above to avoid double claiming.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Use of Home Allowance Card */}
+          {useOfHomeData && useOfHomeData.recommendedAmount > 0 && (
+            <Card className="border-green-200 dark:border-green-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Home className="h-5 w-5 text-green-600" />
+                  Use of Home Allowance
+                </CardTitle>
+                <CardDescription>Business portion of household expenses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Calculation method</span>
+                    <span className="font-medium">
+                      {useOfHomeData.recommended === 'proportional' ? 'Proportional (room-based)' : 'HMRC Flat Rate (hours-based)'}
+                    </span>
+                  </div>
+                  {useOfHomeData.recommended === 'proportional' ? (
+                    <>
+                      <div className="flex justify-between py-2 border-b text-sm">
+                        <span className="text-muted-foreground">Total household expenses</span>
+                        <span>£{useOfHomeData.totalExpenses.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b text-sm">
+                        <span className="text-muted-foreground">Business rooms ({useOfHomeData.businessRooms}) / Total rooms ({useOfHomeData.totalRooms})</span>
+                        <span>{useOfHomeData.roomProportion.toFixed(1)}%</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between py-2 border-b text-sm">
+                        <span className="text-muted-foreground">Hours worked from home per week</span>
+                        <span>{useOfHomeData.hoursPerWeek} hours</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b text-sm">
+                        <span className="text-muted-foreground">Monthly flat rate ({useOfHomeData.hoursPerMonth} hrs/month)</span>
+                        <span>£{useOfHomeData.monthlyFlatRate}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between py-3 font-bold text-lg border-t-2">
+                    <span>Total Use of Home Allowance</span>
+                    <span className="text-green-600">£{Math.round(useOfHomeData.recommendedAmount).toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This is the recommended calculation from your Use of Home settings. 
+                    Configure your expenses and usage in the Use of Home report tab.
                   </p>
                 </div>
               </CardContent>
