@@ -8,6 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Clock } from "lucide-react";
@@ -50,7 +58,6 @@ export function PendingPaymentsTable({ transactions, onUpdateTransaction, onRefr
     if (transaction.businessType === 'Income') {
       return INCOME_CATEGORIES;
     }
-    // Include mileage category for expense transactions
     return [...SA103_EXPENSE_CATEGORIES, MILEAGE_CATEGORY];
   };
 
@@ -94,82 +101,100 @@ export function PendingPaymentsTable({ transactions, onUpdateTransaction, onRefr
   );
 
   return (
-    <div className="rounded-lg border border-dashed border-amber-200/60 dark:border-amber-800/40 bg-amber-50/20 dark:bg-amber-900/5 px-4 py-3">
-      <div className="flex items-center gap-2 mb-2">
-        <Clock className="h-3.5 w-3.5 text-amber-500/70" />
-        <span className="text-sm font-medium text-amber-700/80 dark:text-amber-400/80">Upcoming Payments</span>
-        <span className="text-xs text-amber-600/60 bg-amber-100/50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+    <div className="rounded-lg border border-dashed border-amber-200 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 mb-4">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-200/50 dark:border-amber-800/30">
+        <Clock className="h-4 w-4 text-amber-600" />
+        <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Upcoming Payments</span>
+        <span className="text-xs text-amber-600 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">
           {transactions.length}
         </span>
       </div>
-      <div className="space-y-1.5">
-        {sortedTransactions.map((t) => (
-          <div 
-            key={t.id} 
-            data-testid={`row-pending-${t.id}`}
-            className="flex items-center gap-3 text-sm py-1.5 px-2 rounded bg-white/50 dark:bg-slate-900/30"
-          >
-            <span className="text-xs text-amber-600/70 dark:text-amber-400/70 w-[70px] shrink-0">
-              {format(parseISO(t.date), 'dd/MM/yy')}
-            </span>
-            <div className="flex-1 min-w-0">
-              <span className="text-sm truncate block">{t.description || 'No description'}</span>
-            </div>
-            <span className={cn(
-              "text-sm font-medium w-[80px] text-right shrink-0",
-              t.amount > 0 ? "text-emerald-600" : "text-slate-700 dark:text-slate-300"
-            )}>
-              £{Math.abs(t.amount).toFixed(2)}
-            </span>
-            <div className="inline-flex rounded border border-slate-200 dark:border-slate-700 shrink-0">
-              <Button 
-                data-testid={`button-pending-type-business-${t.id}`}
-                variant={t.type === 'Business' ? 'default' : 'ghost'} 
-                size="sm"
-                className="h-5 text-[9px] px-2 rounded-none rounded-l border-0"
-                onClick={() => handleTypeChange(t, 'Business')}
-              >
-                Business
-              </Button>
-              <Button 
-                data-testid={`button-pending-type-personal-${t.id}`}
-                variant={t.type === 'Personal' ? 'secondary' : 'ghost'} 
-                size="sm"
-                className="h-5 text-[9px] px-2 rounded-none rounded-r border-0 border-l"
-                onClick={() => handleTypeChange(t, 'Personal')}
-              >
-                Personal
-              </Button>
-            </div>
-            {t.type === 'Business' ? (
-              <Select
-                value={t.category || ""}
-                onValueChange={(value) => handleCategoryChange(t, value)}
-              >
-                <SelectTrigger 
-                  data-testid={`select-pending-category-${t.id}`}
-                  className="h-6 text-xs w-[120px] shrink-0"
-                >
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
-                  {getCategoriesForTransaction(t).map((cat) => (
-                    <SelectItem 
-                      key={cat.code} 
-                      value={cat.label}
-                      data-testid={`option-pending-category-${cat.code}`}
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent border-amber-200/50 dark:border-amber-800/30">
+            <TableHead className="text-amber-700 dark:text-amber-400">Date</TableHead>
+            <TableHead className="text-amber-700 dark:text-amber-400">Transaction</TableHead>
+            <TableHead className="text-right text-amber-700 dark:text-amber-400">Amount</TableHead>
+            <TableHead className="text-amber-700 dark:text-amber-400">Type</TableHead>
+            <TableHead className="text-amber-700 dark:text-amber-400">Category</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortedTransactions.map((t) => (
+            <TableRow 
+              key={t.id} 
+              data-testid={`row-pending-${t.id}`}
+              className="hover:bg-amber-50/50 dark:hover:bg-amber-900/20 border-amber-200/30 dark:border-amber-800/20"
+            >
+              <TableCell className="font-medium text-amber-600 dark:text-amber-400">
+                {format(parseISO(t.date), 'dd/MM/yyyy')}
+              </TableCell>
+              <TableCell>
+                <div className="font-medium">{t.description || 'No description'}</div>
+                <div className="text-xs text-muted-foreground">{t.reference || t.merchant}</div>
+              </TableCell>
+              <TableCell className={cn(
+                "text-right font-bold",
+                t.amount > 0 ? "text-emerald-600" : "text-slate-900 dark:text-slate-100"
+              )}>
+                {t.amount > 0 ? '+' : ''}£{Math.abs(t.amount).toFixed(2)}
+              </TableCell>
+              <TableCell>
+                <div className="inline-flex rounded-md border">
+                  <Button 
+                    data-testid={`button-pending-type-business-${t.id}`}
+                    variant={t.type === 'Business' ? 'default' : 'ghost'} 
+                    size="sm"
+                    className="h-6 text-[10px] px-2 rounded-none rounded-l-md border-0"
+                    onClick={() => handleTypeChange(t, 'Business')}
+                  >
+                    <span className="md:hidden">Biz</span>
+                    <span className="hidden md:inline">Business</span>
+                  </Button>
+                  <Button 
+                    data-testid={`button-pending-type-personal-${t.id}`}
+                    variant={t.type === 'Personal' ? 'secondary' : 'ghost'} 
+                    size="sm"
+                    className="h-6 text-[10px] px-2 rounded-none rounded-r-md border-0 border-l"
+                    onClick={() => handleTypeChange(t, 'Personal')}
+                  >
+                    <span className="md:hidden">Per</span>
+                    <span className="hidden md:inline">Personal</span>
+                  </Button>
+                </div>
+              </TableCell>
+              <TableCell>
+                {t.type === 'Business' ? (
+                  <Select
+                    value={t.category || ""}
+                    onValueChange={(value) => handleCategoryChange(t, value)}
+                  >
+                    <SelectTrigger 
+                      data-testid={`select-pending-category-${t.id}`}
+                      className="h-8 text-xs"
                     >
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="w-[120px] shrink-0" />
-            )}
-          </div>
-        ))}
-      </div>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px] overflow-y-auto">
+                      {getCategoriesForTransaction(t).map((cat) => (
+                        <SelectItem 
+                          key={cat.code} 
+                          value={cat.label}
+                          data-testid={`option-pending-category-${cat.code}`}
+                        >
+                          <span className="font-medium">{cat.label}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-sm text-muted-foreground">-</div>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

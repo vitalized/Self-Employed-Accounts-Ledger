@@ -428,14 +428,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {pendingTransactions.length > 0 && (
-          <PendingPaymentsTable
-            transactions={pendingTransactions}
-            onUpdateTransaction={handleTransactionUpdate}
-            onRefresh={refetch}
-          />
-        )}
-
         <div>
            <div className="flex items-center justify-between py-4">
              <h3 className="text-xl font-semibold">Transactions</h3>
@@ -456,6 +448,14 @@ export default function Dashboard() {
             isSyncing={isSyncing}
             unreviewedCount={unreviewedCount}
           />
+
+          {pendingTransactions.length > 0 && (
+            <PendingPaymentsTable
+              transactions={pendingTransactions}
+              onUpdateTransaction={handleTransactionUpdate}
+              onRefresh={refetch}
+            />
+          )}
 
            <TransactionList 
              transactions={filteredTransactions} 
