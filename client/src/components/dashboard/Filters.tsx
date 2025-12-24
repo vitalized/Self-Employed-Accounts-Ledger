@@ -83,7 +83,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                 <SelectSeparator />
                 <SelectGroup>
                   <SelectLabel>Tax Year {taxYears[0]}</SelectLabel>
-                  <SelectItem value={`tax-year-${taxYears[0]}`}>Full Year (6 Apr - 5 Apr)</SelectItem>
+                  <SelectItem value={`tax-year-${taxYears[0]}`}>Current Tax Year (6 Apr - 5 Apr)</SelectItem>
                   <SelectItem value={`mtd-q1-${taxYears[0]}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
                   <SelectItem value={`mtd-q2-${taxYears[0]}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
                   <SelectItem value={`mtd-q3-${taxYears[0]}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
