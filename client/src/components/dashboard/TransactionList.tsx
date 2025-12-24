@@ -31,7 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
+import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES, MILEAGE_CATEGORY } from "@shared/categories";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 
@@ -68,6 +68,13 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
   const [pendingNotes, setPendingNotes] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 100;
+  
+  // Mileage dialog state
+  const [showMileageDialog, setShowMileageDialog] = useState(false);
+  const [mileageTransaction, setMileageTransaction] = useState<Transaction | null>(null);
+  const [mileageInput, setMileageInput] = useState("");
+  const [mileageDescription, setMileageDescription] = useState("");
+  const [existingMileageTrip, setExistingMileageTrip] = useState<{ id: string; miles: string; description: string } | null>(null);
 
   const toggleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -177,7 +184,8 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
     if (t.amount > 0) {
       return INCOME_CATEGORIES;
     }
-    return SA103_EXPENSE_CATEGORIES;
+    // Include mileage category for expense transactions
+    return [...SA103_EXPENSE_CATEGORIES, MILEAGE_CATEGORY];
   };
 
   const handleTypeChange = (transaction: Transaction, type: 'Business' | 'Personal', businessType?: 'Income' | 'Expense') => {
@@ -206,7 +214,40 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
     }
   };
 
-  const handleCategoryChange = (transaction: Transaction, category: string) => {
+  const handleCategoryChange = async (transaction: Transaction, category: string) => {
+    // If selecting mileage allowance, show mileage input dialog
+    if (category === MILEAGE_CATEGORY.label) {
+      setMileageTransaction(transaction);
+      setMileageDescription(transaction.description || transaction.merchant || "");
+      setMileageInput("");
+      setExistingMileageTrip(null);
+      
+      // Check if there's already a mileage trip for this transaction
+      try {
+        const response = await fetch(`/api/mileage-trips/by-transaction/${transaction.id}`);
+        if (response.ok) {
+          const trip = await response.json();
+          setExistingMileageTrip(trip);
+          setMileageInput(String(trip.miles));
+          setMileageDescription(trip.description);
+        }
+      } catch (error) {
+        // No existing trip, that's fine
+      }
+      
+      setShowMileageDialog(true);
+      return;
+    }
+    
+    // If changing away from mileage category, delete any linked mileage trip
+    if (transaction.category === MILEAGE_CATEGORY.label && category !== MILEAGE_CATEGORY.label) {
+      try {
+        await fetch(`/api/mileage-trips/by-transaction/${transaction.id}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error("Error deleting mileage trip:", error);
+      }
+    }
+    
     onUpdateTransaction(transaction.id, { category });
     
     const keyword = transaction.merchant || transaction.description;
@@ -224,6 +265,63 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
     });
     setExistingRule(existing || null);
     setShowRuleDialog(true);
+  };
+  
+  const handleMileageSave = async () => {
+    if (!mileageTransaction) return;
+    
+    const miles = parseFloat(mileageInput);
+    if (isNaN(miles) || miles <= 0) {
+      toast({ title: "Invalid miles", description: "Please enter a valid positive number.", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      // Create or update mileage trip
+      if (existingMileageTrip) {
+        await fetch(`/api/mileage-trips/${existingMileageTrip.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            miles,
+            description: mileageDescription,
+          }),
+        });
+        toast({ title: "Mileage updated", description: `Updated trip: ${miles} miles` });
+      } else {
+        await fetch('/api/mileage-trips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: mileageTransaction.date,
+            description: mileageDescription,
+            miles,
+            transactionId: mileageTransaction.id,
+          }),
+        });
+        toast({ title: "Mileage recorded", description: `Recorded ${miles} miles for this transaction` });
+      }
+      
+      // Update the transaction category
+      onUpdateTransaction(mileageTransaction.id, { category: MILEAGE_CATEGORY.label });
+      
+      setShowMileageDialog(false);
+      setMileageTransaction(null);
+      setMileageInput("");
+      setMileageDescription("");
+      setExistingMileageTrip(null);
+    } catch (error) {
+      console.error("Error saving mileage:", error);
+      toast({ title: "Error", description: "Failed to save mileage trip.", variant: "destructive" });
+    }
+  };
+  
+  const handleMileageCancel = () => {
+    setShowMileageDialog(false);
+    setMileageTransaction(null);
+    setMileageInput("");
+    setMileageDescription("");
+    setExistingMileageTrip(null);
   };
 
   const handleCreateRule = async () => {
@@ -487,6 +585,70 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
           </div>
         </div>
       )}
+
+      {/* Mileage Input Dialog */}
+      <Dialog open={showMileageDialog} onOpenChange={(open) => !open && handleMileageCancel()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Business Mileage</DialogTitle>
+            <DialogDescription>
+              Enter the miles driven for this trip. HMRC allows 45p per mile for the first 10,000 miles and 25p per mile thereafter.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="mileage-description">Trip Description</Label>
+              <Input
+                id="mileage-description"
+                data-testid="input-mileage-description"
+                value={mileageDescription}
+                onChange={(e) => setMileageDescription(e.target.value)}
+                placeholder="e.g., Client meeting in London"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="mileage-miles">Miles Driven</Label>
+              <Input
+                id="mileage-miles"
+                data-testid="input-mileage-miles"
+                type="number"
+                step="0.1"
+                min="0"
+                value={mileageInput}
+                onChange={(e) => setMileageInput(e.target.value)}
+                placeholder="e.g., 45.5"
+              />
+              <p className="text-xs text-muted-foreground">
+                This cost will be claimed via mileage allowance rather than as an expense.
+              </p>
+            </div>
+            
+            {mileageInput && parseFloat(mileageInput) > 0 && (
+              <div className="rounded-md bg-green-50 dark:bg-green-950/30 p-3 border border-green-200 dark:border-green-900">
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  Allowance for {mileageInput} miles: <span className="font-bold">
+                    {parseFloat(mileageInput) <= 10000 
+                      ? `£${(parseFloat(mileageInput) * 0.45).toFixed(2)}`
+                      : `£${((10000 * 0.45) + ((parseFloat(mileageInput) - 10000) * 0.25)).toFixed(2)}`
+                    }
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button variant="outline" onClick={handleMileageCancel} data-testid="button-mileage-cancel">
+              Cancel
+            </Button>
+            <Button onClick={handleMileageSave} data-testid="button-mileage-save">
+              {existingMileageTrip ? "Update Mileage" : "Save Mileage"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
         <DialogContent className="sm:max-w-md">

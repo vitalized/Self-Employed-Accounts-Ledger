@@ -11,7 +11,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Clock } from "lucide-react";
-import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
+import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES, MILEAGE_CATEGORY } from "@shared/categories";
 
 interface CategorizationRule {
   id: string;
@@ -50,7 +50,8 @@ export function PendingPaymentsTable({ transactions, onUpdateTransaction, onRefr
     if (transaction.businessType === 'Income') {
       return INCOME_CATEGORIES;
     }
-    return SA103_EXPENSE_CATEGORIES;
+    // Include mileage category for expense transactions
+    return [...SA103_EXPENSE_CATEGORIES, MILEAGE_CATEGORY];
   };
 
   const handleTypeChange = async (transaction: Transaction, newType: 'Business' | 'Personal') => {
