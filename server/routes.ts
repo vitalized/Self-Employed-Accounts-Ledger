@@ -759,8 +759,10 @@ export async function registerRoutes(
           
           if (existingTx) {
             // Update status if it changed from Pending to Cleared
-            const newStatus = item.status === "SETTLED" ? "Cleared" : "Pending";
-            if (existingTx.status === "Pending" && newStatus === "Cleared") {
+            // Starling statuses: PENDING, SETTLED, REVERSED, DECLINED, REFUNDED, RETRYING, ACCOUNT_CHECK
+            // Any non-PENDING status means the transaction is no longer awaiting settlement
+            const isNoLongerPending = item.status !== "PENDING";
+            if (existingTx.status === "Pending" && isNoLongerPending) {
               await storage.updateTransaction(existingTx.id, { status: "Cleared" });
               totalStatusUpdated++;
             }
@@ -833,7 +835,7 @@ export async function registerRoutes(
             type: transactionType,
             category,
             businessType,
-            status: item.status === "SETTLED" ? "Cleared" : "Pending",
+            status: item.status !== "PENDING" ? "Cleared" : "Pending",
             tags: [`starling:${feedItemUid}`],
           }, fingerprint);
 
