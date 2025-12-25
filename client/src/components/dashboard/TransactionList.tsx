@@ -563,9 +563,13 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                             key={cat.code}
                             value={cat.label}
                             data-testid={`option-category-${cat.code}`}
-                            title={tooltipText || undefined}
                           >
-                            <span className="font-medium">{cat.label}</span>
+                            <span 
+                              className="font-medium w-full block" 
+                              title={tooltipText || undefined}
+                            >
+                              {cat.label}
+                            </span>
                           </SelectItem>
                         );
                       })}
