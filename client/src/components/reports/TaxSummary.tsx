@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileSpreadsheet, FileText, Calendar } from "lucide-react";
 import { Transaction } from "@/lib/types";
-import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
+import { SA103_EXPENSE_CATEGORIES, getHMRCBoxCode } from "@shared/categories";
 import * as XLSX from "xlsx";
 
 interface TaxSummaryProps {
@@ -51,51 +51,27 @@ export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, t
       if (t.businessType === 'Income') {
         turnover += amount;
       } else if (t.businessType === 'Expense') {
-        const cat = t.category || 'Other Expenses';
+        // Use the helper to map any category (including legacy ones) to the correct HMRC box
+        const boxCode = getHMRCBoxCode(t.category || 'Other Expenses');
         
-        // Map SA103 category labels to expense buckets
-        switch (cat) {
-          case 'Cost of Goods':
-            expenses.costOfGoods += amount;
-            break;
-          case 'Subcontractor Costs':
-            expenses.construction += amount;
-            break;
-          case 'Staff Costs':
-            expenses.wages += amount;
-            break;
-          case 'Travel & Vehicle':
+        switch (boxCode) {
+          case '17': expenses.costOfGoods += amount; break;
+          case '18': expenses.construction += amount; break;
+          case '19': expenses.wages += amount; break;
+          case '20':
             expenses.travel += amount;
             expenses.disallowable.travel += amount * 0.05; // 5% personal use estimate
             break;
-          case 'Premises Costs':
-            expenses.rent += amount;
-            break;
-          case 'Repairs & Maintenance':
-            expenses.repairs += amount;
-            break;
-          case 'Office Costs':
-            expenses.admin += amount;
-            break;
-          case 'Advertising':
-            expenses.advertising += amount;
-            break;
-          case 'Loan Interest':
-            expenses.interest += amount;
-            break;
-          case 'Bank Charges':
-            expenses.bankCharges += amount;
-            break;
-          case 'Bad Debts':
-            expenses.badDebts += amount;
-            break;
-          case 'Professional Fees':
-            expenses.professional += amount;
-            break;
-          case 'Depreciation':
-            expenses.depreciation += amount;
-            break;
-          case 'Other Expenses':
+          case '21': expenses.rent += amount; break;
+          case '22': expenses.repairs += amount; break;
+          case '23': expenses.admin += amount; break;
+          case '24': expenses.advertising += amount; break;
+          case '25': expenses.interest += amount; break;
+          case '26': expenses.bankCharges += amount; break;
+          case '27': expenses.badDebts += amount; break;
+          case '28': expenses.professional += amount; break;
+          case '29': expenses.depreciation += amount; break;
+          case '30':
           default:
             expenses.other += amount;
             break;

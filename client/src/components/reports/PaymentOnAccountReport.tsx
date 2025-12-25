@@ -6,7 +6,7 @@ import { Download, FileSpreadsheet, Calendar, AlertCircle, Clock, Info } from "l
 import { format, isBefore, isAfter, differenceInDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
+import { SA103_EXPENSE_CATEGORIES, getHMRCBoxCode } from "@shared/categories";
 import * as XLSX from 'xlsx';
 
 interface PaymentOnAccountReportProps {
@@ -102,26 +102,24 @@ export function PaymentOnAccountReport({ transactions, yearLabel }: PaymentOnAcc
           otherIncome += amount;
         }
       } else if (t.businessType === 'Expense' && t.category) {
-        const categoryDef = SA103_EXPENSE_CATEGORIES.find(c => c.label === t.category);
-        if (categoryDef) {
-          switch (categoryDef.code) {
-            case '17': expenses.costOfGoods += amount; break;
-            case '18': expenses.construction += amount; break;
-            case '19': expenses.wages += amount; break;
-            case '20': expenses.travel += amount; break;
-            case '21': expenses.rent += amount; break;
-            case '22': expenses.repairs += amount; break;
-            case '23': expenses.admin += amount; break;
-            case '24': expenses.advertising += amount; break;
-            case '25': expenses.interest += amount; break;
-            case '26': expenses.bankCharges += amount; break;
-            case '27': expenses.badDebts += amount; break;
-            case '28': expenses.professional += amount; break;
-            case '29': expenses.depreciation += amount; break;
-            case '30': expenses.other += amount; break;
-          }
-        } else {
-          expenses.other += amount;
+        // Use the helper to map any category (including legacy ones) to the correct HMRC box
+        const boxCode = getHMRCBoxCode(t.category);
+        switch (boxCode) {
+          case '17': expenses.costOfGoods += amount; break;
+          case '18': expenses.construction += amount; break;
+          case '19': expenses.wages += amount; break;
+          case '20': expenses.travel += amount; break;
+          case '21': expenses.rent += amount; break;
+          case '22': expenses.repairs += amount; break;
+          case '23': expenses.admin += amount; break;
+          case '24': expenses.advertising += amount; break;
+          case '25': expenses.interest += amount; break;
+          case '26': expenses.bankCharges += amount; break;
+          case '27': expenses.badDebts += amount; break;
+          case '28': expenses.professional += amount; break;
+          case '29': expenses.depreciation += amount; break;
+          case '30': expenses.other += amount; break;
+          default: expenses.other += amount; break;
         }
       }
     });
