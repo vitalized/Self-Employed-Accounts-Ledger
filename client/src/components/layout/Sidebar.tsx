@@ -40,7 +40,7 @@ const reportSubItems = [
   { href: "/reports/profit-loss", label: "Profit & Loss", icon: TrendingUp },
   { href: "/reports/expenses", label: "Expense Breakdown", icon: Wallet },
   { href: "/reports/tax-calculator", label: "Tax Calculator", icon: Calculator },
-  { href: "/reports/vat", label: "VAT Summary", icon: ReceiptText },
+  { href: "/reports/vat", label: "VAT Threshold Tracker", icon: ReceiptText },
   { href: "/reports/mileage", label: "Mileage Report", icon: Car },
   { href: "/reports/mtd-quarterly", label: "MTD Quarterly", icon: Calendar },
   { href: "/reports/use-of-home", label: "Use of Home", icon: Home },
