@@ -10,7 +10,8 @@ import { Calculator, PiggyBank, Calendar, AlertCircle, TrendingUp, Wallet, Downl
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Cell } from "recharts";
 import * as XLSX from 'xlsx';
 import { useQuery } from "@tanstack/react-query";
-import { SA103_EXPENSE_CATEGORIES, getHMRCBoxCode } from "@shared/categories";
+import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
+import { Category } from "@shared/schema";
 
 interface TaxPaymentPlannerProps {
   transactions: Transaction[];
@@ -28,6 +29,32 @@ const STORAGE_KEY = 'taxtrack-payment-planner';
 export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlannerProps) {
   const startYear = parseInt(yearLabel.split('-')[0]);
   const endYear = 2000 + parseInt(yearLabel.split('-')[1]);
+
+  // Fetch categories to get hmrcBox mappings directly from database
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+  });
+
+  // Create a lookup map from category label to hmrcBox
+  const categoryBoxMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach(cat => {
+      if (cat.hmrcBox) {
+        map[cat.label] = cat.hmrcBox;
+      }
+    });
+    return map;
+  }, [categories]);
+
+  // Helper to get HMRC box code for a category - uses database hmrcBox directly
+  const getBoxCode = (categoryLabel: string): string => {
+    return categoryBoxMap[categoryLabel] || "30"; // Default to "Other Expenses"
+  };
 
   const [plannerData, setPlannerData] = useState<PlannerData>(() => {
     const stored = localStorage.getItem(`${STORAGE_KEY}-${yearLabel}`);
@@ -129,8 +156,8 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
           otherIncome += amount;
         }
       } else if (t.businessType === 'Expense' && t.category) {
-        // Use the helper to map any category (including legacy ones) to the correct HMRC box
-        const boxCode = getHMRCBoxCode(t.category);
+        // Use the category's hmrcBox field directly from the database
+        const boxCode = getBoxCode(t.category);
         switch (boxCode) {
           case '17': expenses.costOfGoods += amount; break;
           case '18': expenses.construction += amount; break;
@@ -209,7 +236,7 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
       class2NI: Math.round(class2NI),
       totalTax
     };
-  }, [transactions, useOfHomeData, mileageAllowance]);
+  }, [transactions, useOfHomeData, mileageAllowance, categoryBoxMap]);
 
   const paymentSchedule = useMemo(() => {
     const now = new Date();

@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileSpreadsheet, FileText, Calendar } from "lucide-react";
 import { Transaction } from "@/lib/types";
-import { SA103_EXPENSE_CATEGORIES, getHMRCBoxCode } from "@shared/categories";
+import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
+import { Category } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 
 interface TaxSummaryProps {
@@ -16,6 +18,32 @@ interface TaxSummaryProps {
 }
 
 export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, taxYears = [] }: TaxSummaryProps) {
+  // Fetch categories to get hmrcBox mappings directly from database
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+  });
+
+  // Create a lookup map from category label to hmrcBox
+  const categoryBoxMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach(cat => {
+      if (cat.hmrcBox) {
+        map[cat.label] = cat.hmrcBox;
+      }
+    });
+    return map;
+  }, [categories]);
+
+  // Helper to get HMRC box code for a category - uses database hmrcBox directly
+  const getBoxCode = (categoryLabel: string): string => {
+    return categoryBoxMap[categoryLabel] || "30"; // Default to "Other Expenses"
+  };
+
   const data = useMemo(() => {
     let turnover = 0;
     let otherIncome = 0;
@@ -51,8 +79,8 @@ export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, t
       if (t.businessType === 'Income') {
         turnover += amount;
       } else if (t.businessType === 'Expense') {
-        // Use the helper to map any category (including legacy ones) to the correct HMRC box
-        const boxCode = getHMRCBoxCode(t.category || 'Other Expenses');
+        // Use the category's hmrcBox field directly from the database
+        const boxCode = getBoxCode(t.category || 'Other Expenses');
         
         switch (boxCode) {
           case '17': expenses.costOfGoods += amount; break;
@@ -172,7 +200,7 @@ export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, t
            total: round(incomeTax + class4NI + class2NI)
        }
     };
-  }, [transactions]);
+  }, [transactions, categoryBoxMap]);
 
   const cardRef = useRef<HTMLDivElement>(null);
 

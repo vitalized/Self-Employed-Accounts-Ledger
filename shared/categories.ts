@@ -16,43 +16,6 @@ export const SA103_EXPENSE_CATEGORIES = [
   { code: "30", label: "Other Expenses", description: "Books, magazines, subscriptions, courses, training and other" },
 ] as const;
 
-// Mapping from legacy/custom category labels to official HMRC box codes
-// This ensures existing transactions are correctly categorized
-export const LEGACY_CATEGORY_MAPPING: Record<string, string> = {
-  // Custom categories mapped to HMRC boxes
-  "Accountancy": "28",
-  "Books and Professional Magazines": "30",
-  "Broadband": "23",
-  "Courses and Training": "30",
-  "Hotels and Business Accommodation": "20",
-  "Insurance & Licences": "21",
-  "Mobile Phone": "23",
-  "Postage and Stationery": "23",
-  "Software and Computer Incidentals": "23",
-  "Subscriptions": "30",
-  "Website and Hosting": "24",
-  // Direct mappings (label to code)
-  "Cost of Goods": "17",
-  "Subcontractor Costs": "18",
-  "Staff Costs": "19",
-  "Travel & Vehicle": "20",
-  "Premises Costs": "21",
-  "Repairs & Maintenance": "22",
-  "Office Costs": "23",
-  "Advertising": "24",
-  "Loan Interest": "25",
-  "Bank Charges": "26",
-  "Bad Debts": "27",
-  "Professional Fees": "28",
-  "Depreciation": "29",
-  "Other Expenses": "30",
-};
-
-// Helper function to get the HMRC box code for any category label
-export function getHMRCBoxCode(categoryLabel: string): string {
-  return LEGACY_CATEGORY_MAPPING[categoryLabel] || "30"; // Default to "Other Expenses"
-}
-
 // Helper function to get the official category label for a box code
 export function getOfficialCategoryLabel(code: string): string {
   const category = SA103_EXPENSE_CATEGORIES.find(c => c.code === code);

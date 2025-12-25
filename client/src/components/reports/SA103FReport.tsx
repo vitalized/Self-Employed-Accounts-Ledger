@@ -4,7 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, FileText, Car, Home } from "lucide-react";
 import { Transaction } from "@/lib/types";
-import { SA103_EXPENSE_CATEGORIES, getHMRCBoxCode } from "@shared/categories";
+import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
+import { Category } from "@shared/schema";
 import * as XLSX from "xlsx";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { parseISO, format } from "date-fns";
@@ -25,6 +26,32 @@ interface MileageSummary {
 
 export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Fetch categories to get hmrcBox mappings directly from database
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+  });
+
+  // Create a lookup map from category label to hmrcBox
+  const categoryBoxMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach(cat => {
+      if (cat.hmrcBox) {
+        map[cat.label] = cat.hmrcBox;
+      }
+    });
+    return map;
+  }, [categories]);
+
+  // Helper to get HMRC box code for a category - uses database hmrcBox directly
+  const getBoxCode = (categoryLabel: string): string => {
+    return categoryBoxMap[categoryLabel] || "30"; // Default to "Other Expenses"
+  };
 
   // Fetch mileage summary for the tax year
   const { data: mileageSummary } = useQuery<MileageSummary>({
@@ -124,8 +151,8 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
           otherIncome += amount;
         }
       } else if (t.businessType === 'Expense' && t.category) {
-        // Use the helper to map any category (including legacy ones) to the correct HMRC box
-        const boxCode = getHMRCBoxCode(t.category);
+        // Use the category's hmrcBox field directly from the database
+        const boxCode = getBoxCode(t.category);
         switch (boxCode) {
           case '17': expenses.costOfGoods += amount; break;
           case '18': expenses.construction += amount; break;
@@ -220,7 +247,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
         total: Math.round(incomeTax + class4NI + class2NI)
       }
     };
-  }, [transactions, useOfHomeData]);
+  }, [transactions, useOfHomeData, categoryBoxMap]);
 
   const monthlyData = useMemo(() => {
     const months: Record<string, { name: string, income: number, expenses: number, profit: number }> = {};
@@ -526,7 +553,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
   const getTransactionsForBox = (boxCode: string) => {
     return transactions.filter(t => {
       if (t.type !== 'Business' || t.businessType !== 'Expense' || !t.category) return false;
-      return getHMRCBoxCode(t.category) === boxCode;
+      return getBoxCode(t.category) === boxCode;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   };
 
