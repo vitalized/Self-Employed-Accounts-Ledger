@@ -24,8 +24,7 @@ import {
   Calendar,
   Home,
   Clock,
-  PiggyBank,
-  Trophy
+  PiggyBank
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -82,7 +81,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const mainLinks = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/transactions", label: "Transactions", icon: Receipt },
-    { href: "/rewards", label: "Rewards", icon: Trophy },
   ];
 
   const isReportsActive = location.startsWith('/reports');

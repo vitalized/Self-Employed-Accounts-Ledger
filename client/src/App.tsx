@@ -9,7 +9,6 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
-import Gamification from "@/pages/Gamification";
 
 function Router() {
   return (
@@ -20,7 +19,6 @@ function Router() {
       <Route path="/reports/:reportId" component={Reports} />
       <Route path="/settings" component={Settings} />
       <Route path="/settings/:sectionId" component={Settings} />
-      <Route path="/rewards" component={Gamification} />
       <Route component={NotFound} />
     </Switch>
   );
