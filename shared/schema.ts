@@ -160,3 +160,98 @@ export const insertMileageTripSchema = createInsertSchema(mileageTrips).omit({
 
 export type InsertMileageTrip = z.infer<typeof insertMileageTripSchema>;
 export type MileageTrip = typeof mileageTrips.$inferSelect;
+
+// Achievements for gamification
+export const achievements = pgTable("achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(), // Lucide icon name
+  points: integer("points").notNull().default(10),
+  category: text("category").notNull(), // 'budgeting', 'savings', 'tracking', 'milestones'
+  threshold: integer("threshold"), // Numeric threshold to unlock (e.g., 100 transactions)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAchievementSchema = createInsertSchema(achievements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type Achievement = typeof achievements.$inferSelect;
+
+// User achievements - tracks which achievements a user has unlocked
+export const userAchievements = pgTable("user_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  achievementId: varchar("achievement_id").references(() => achievements.id).notNull(),
+  unlockedAt: timestamp("unlocked_at").defaultNow().notNull(),
+});
+
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({
+  id: true,
+  unlockedAt: true,
+});
+
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+
+// Challenges for gamification
+export const challenges = pgTable("challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(),
+  points: integer("points").notNull().default(25),
+  challengeType: text("challenge_type").notNull(), // 'weekly', 'monthly', 'one-time'
+  targetValue: integer("target_value").notNull(), // Target to achieve
+  metricType: text("metric_type").notNull(), // 'transactions_categorized', 'savings_rate', 'expense_reduction', etc.
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertChallengeSchema = createInsertSchema(challenges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChallenge = z.infer<typeof insertChallengeSchema>;
+export type Challenge = typeof challenges.$inferSelect;
+
+// User challenge progress
+export const userChallenges = pgTable("user_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  challengeId: varchar("challenge_id").references(() => challenges.id).notNull(),
+  currentValue: integer("current_value").notNull().default(0),
+  isCompleted: integer("is_completed").notNull().default(0),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertUserChallengeSchema = createInsertSchema(userChallenges).omit({
+  id: true,
+  startedAt: true,
+});
+
+export type InsertUserChallenge = z.infer<typeof insertUserChallengeSchema>;
+export type UserChallenge = typeof userChallenges.$inferSelect;
+
+// User points and level tracking
+export const userStats = pgTable("user_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  totalPoints: integer("total_points").notNull().default(0),
+  level: integer("level").notNull().default(1),
+  streak: integer("streak").notNull().default(0), // Days of consecutive activity
+  lastActivityDate: timestamp("last_activity_date"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserStatsSchema = createInsertSchema(userStats).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertUserStats = z.infer<typeof insertUserStatsSchema>;
+export type UserStats = typeof userStats.$inferSelect;
