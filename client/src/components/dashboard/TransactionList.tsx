@@ -34,6 +34,8 @@ import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, Chevr
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES, MILEAGE_CATEGORY } from "@shared/categories";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import type { Category } from "@shared/schema";
 
 interface CategorizationRule {
   id: string;
@@ -68,6 +70,16 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
   const [pendingNotes, setPendingNotes] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 100;
+  
+  // Fetch database categories
+  const { data: dbCategories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+  });
   
   // Mileage dialog state
   const [showMileageDialog, setShowMileageDialog] = useState(false);
@@ -181,11 +193,26 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
   };
 
   const getCategoriesForTransaction = (t: Transaction) => {
-    if (t.amount > 0) {
-      return INCOME_CATEGORIES;
+    // Get categories from database, filtered by type
+    const isIncome = t.amount > 0;
+    const typeFilter = isIncome ? 'Income' : 'Expense';
+    
+    // Build category list from database
+    const categories = dbCategories
+      .filter(c => c.type === typeFilter)
+      .map(c => ({ code: c.code, label: c.label }));
+    
+    // For expenses, also add the mileage category
+    if (!isIncome) {
+      categories.push({ code: MILEAGE_CATEGORY.code, label: MILEAGE_CATEGORY.label });
     }
-    // Include mileage category for expense transactions
-    return [...SA103_EXPENSE_CATEGORIES, MILEAGE_CATEGORY];
+    
+    // If current transaction has a category not in the list (legacy), add it so it displays
+    if (t.category && !categories.some(c => c.label === t.category)) {
+      categories.unshift({ code: 'LEGACY', label: t.category });
+    }
+    
+    return categories;
   };
 
   const handleTypeChange = (transaction: Transaction, type: 'Business' | 'Personal', businessType?: 'Income' | 'Expense') => {
