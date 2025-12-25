@@ -660,7 +660,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
                   <Car className="h-5 w-5 text-blue-600" />
                   Mileage Allowance
                 </CardTitle>
-                <CardDescription>HMRC approved mileage rates (separate from vehicle expenses above)</CardDescription>
+                <CardDescription>Included in Box 20 above (Car, van and travel expenses) - HMRC approved mileage rates</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
