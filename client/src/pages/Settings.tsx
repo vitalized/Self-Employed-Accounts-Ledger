@@ -226,10 +226,10 @@ export default function Settings() {
   };
 
   const handleAddCategory = async () => {
-    if (!newCategory.code.trim() || !newCategory.label.trim()) {
+    if (!newCategory.label.trim()) {
       toast({
-        title: "Code and Label Required",
-        description: "Please enter both a code and label for the category.",
+        title: "Label Required",
+        description: "Please enter a label for the category.",
         variant: "destructive"
       });
       return;
@@ -244,11 +244,22 @@ export default function Settings() {
       return;
     }
 
+    // Auto-generate unique code using timestamp to ensure uniqueness
+    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
+    let autoCode: string;
+    if (newCategory.type === "Expense" && newCategory.hmrcBox) {
+      // For expenses: Box + timestamp suffix (e.g., "23-A1B2")
+      autoCode = `${newCategory.hmrcBox}-${timestamp}`;
+    } else {
+      // For income: I + timestamp suffix (e.g., "I-A1B2")
+      autoCode = `I-${timestamp}`;
+    }
+
     try {
       const response = await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newCategory)
+        body: JSON.stringify({ ...newCategory, code: autoCode })
       });
 
       if (response.ok) {
@@ -293,8 +304,8 @@ export default function Settings() {
   };
 
   const handleSaveEditCategory = async () => {
-    if (!editingCategoryId || !editCategory.code.trim() || !editCategory.label.trim()) {
-      toast({ title: "Code and Label Required", variant: "destructive" });
+    if (!editingCategoryId || !editCategory.label.trim()) {
+      toast({ title: "Label Required", variant: "destructive" });
       return;
     }
 
@@ -868,17 +879,7 @@ export default function Settings() {
               <CardContent className="space-y-6">
                 <div className="space-y-4 border rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
                   <h4 className="font-medium text-sm">Add New Category</h4>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="cat-code">Code</Label>
-                      <Input
-                        id="cat-code"
-                        placeholder="e.g. C12"
-                        value={newCategory.code}
-                        onChange={(e) => setNewCategory({ ...newCategory, code: e.target.value })}
-                        data-testid="input-category-code"
-                      />
-                    </div>
+                  <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="cat-label">Label</Label>
                       <Input
@@ -960,13 +961,7 @@ export default function Settings() {
                         >
                           {editingCategoryId === cat.id ? (
                             <div className="space-y-3">
-                              <div className="grid gap-3 md:grid-cols-4">
-                                <Input
-                                  value={editCategory.code}
-                                  onChange={(e) => setEditCategory({ ...editCategory, code: e.target.value })}
-                                  placeholder="Code"
-                                  data-testid={`input-edit-cat-code-${cat.id}`}
-                                />
+                              <div className="grid gap-3 md:grid-cols-3">
                                 <Input
                                   value={editCategory.label}
                                   onChange={(e) => setEditCategory({ ...editCategory, label: e.target.value })}
@@ -1029,9 +1024,6 @@ export default function Settings() {
                           ) : (
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 text-sm">
-                                <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded w-12 text-center">
-                                  {cat.code}
-                                </span>
                                 <span className="font-medium">{cat.label}</span>
                                 {cat.hmrcBox && (
                                   <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
@@ -1085,13 +1077,7 @@ export default function Settings() {
                         >
                           {editingCategoryId === cat.id ? (
                             <div className="space-y-3">
-                              <div className="grid gap-3 md:grid-cols-4">
-                                <Input
-                                  value={editCategory.code}
-                                  onChange={(e) => setEditCategory({ ...editCategory, code: e.target.value })}
-                                  placeholder="Code"
-                                  data-testid={`input-edit-cat-code-${cat.id}`}
-                                />
+                              <div className="grid gap-3 md:grid-cols-3">
                                 <Input
                                   value={editCategory.label}
                                   onChange={(e) => setEditCategory({ ...editCategory, label: e.target.value })}
@@ -1154,9 +1140,6 @@ export default function Settings() {
                           ) : (
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 text-sm">
-                                <span className="font-mono text-xs bg-green-100 dark:bg-green-800 px-2 py-1 rounded w-12 text-center">
-                                  {cat.code}
-                                </span>
                                 <span className="font-medium">{cat.label}</span>
                                 {cat.description && (
                                   <span className="text-muted-foreground text-xs hidden md:inline">- {cat.description}</span>

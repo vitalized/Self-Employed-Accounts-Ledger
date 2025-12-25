@@ -503,7 +503,19 @@ export async function registerRoutes(
   // Create category
   app.post("/api/categories", async (req, res) => {
     try {
-      const validatedData = insertCategorySchema.parse(req.body);
+      const data = { ...req.body };
+      
+      // Auto-generate unique code if not provided
+      if (!data.code) {
+        const timestamp = Date.now().toString(36).slice(-6).toUpperCase();
+        if (data.type === "Expense" && data.hmrcBox) {
+          data.code = `${data.hmrcBox}-${timestamp}`;
+        } else {
+          data.code = `I-${timestamp}`;
+        }
+      }
+      
+      const validatedData = insertCategorySchema.parse(data);
       const category = await storage.createCategory(validatedData);
       res.status(201).json(category);
     } catch (error) {
