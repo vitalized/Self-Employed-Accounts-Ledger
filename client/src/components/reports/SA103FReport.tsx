@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, FileText, Car, Home, ChevronRight } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Car, Home } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES, getHMRCBoxCode } from "@shared/categories";
 import * as XLSX from "xlsx";
@@ -595,9 +595,8 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
     return (
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value={boxAllowable} className="border-b border-dashed border-gray-100 dark:border-gray-800">
-          <AccordionTrigger className="py-2 hover:no-underline [&[data-state=open]>div>.chevron]:rotate-90">
+          <AccordionTrigger className="py-2 hover:no-underline [&>svg]:hidden">
             <div className="flex items-center w-full text-sm">
-              <ChevronRight className="h-4 w-4 mr-1 shrink-0 text-muted-foreground transition-transform duration-200 chevron" />
               <div className="flex-1 pr-4 text-left font-medium">
                 {label}
                 <span className="ml-2 text-xs text-muted-foreground font-normal">({boxTransactions.length} transactions)</span>
@@ -613,7 +612,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
             </div>
           </AccordionTrigger>
           <AccordionContent>
-            <div className="ml-5 mt-1 mb-2 space-y-1 bg-slate-50 dark:bg-slate-900/50 rounded-md p-3 max-h-64 overflow-y-auto">
+            <div className="mt-1 mb-2 space-y-1 bg-slate-50 dark:bg-slate-900/50 rounded-md p-3 max-h-64 overflow-y-auto">
               {boxTransactions.map((t) => (
                 <div key={t.id} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200 dark:border-slate-700 last:border-0">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
