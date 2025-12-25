@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, Calendar, AlertCircle, Clock, Info } from "lucide-react";
 import { format, isBefore, isAfter, differenceInDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
 import * as XLSX from 'xlsx';
 
 interface PaymentOnAccountReportProps {
@@ -16,32 +18,141 @@ export function PaymentOnAccountReport({ transactions, yearLabel }: PaymentOnAcc
   const startYear = parseInt(yearLabel.split('-')[0]);
   const endYear = 2000 + parseInt(yearLabel.split('-')[1]);
 
+  const { data: mileageSummary, isSuccess: mileageLoaded } = useQuery<{ allowance: number }>({
+    queryKey: ["/api/mileage-summary", yearLabel],
+    queryFn: async () => {
+      const res = await fetch(`/api/mileage-summary?taxYear=${yearLabel}`);
+      if (!res.ok) throw new Error("Failed to fetch mileage summary");
+      return res.json();
+    },
+  });
+
+  const mileageAllowance = mileageLoaded ? (mileageSummary?.allowance || 0) : 0;
+
+  // Get Use of Home data from localStorage (same as SA103F and TaxPaymentPlanner)
+  const useOfHomeData = useMemo(() => {
+    const storageKey = `useOfHome_${yearLabel}`;
+    try {
+      const expensesRaw = localStorage.getItem(storageKey);
+      const totalRooms = parseInt(localStorage.getItem(`${storageKey}_rooms`) || '0') || 0;
+      const businessRooms = parseInt(localStorage.getItem(`${storageKey}_bizRooms`) || '0') || 0;
+      const hoursPerWeek = parseInt(localStorage.getItem(`${storageKey}_hours`) || '0') || 0;
+
+      if (!expensesRaw && totalRooms === 0 && hoursPerWeek === 0) {
+        return null;
+      }
+
+      const expenses = expensesRaw ? JSON.parse(expensesRaw) : {};
+      const totalExpenses = Object.values(expenses).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+      const roomProportion = totalRooms > 0 ? businessRooms / totalRooms : 0;
+      const proportionalClaim = totalExpenses * roomProportion;
+
+      const hoursPerMonth = hoursPerWeek * 4.33;
+      let monthlyFlatRate = 0;
+      if (hoursPerMonth >= 101) monthlyFlatRate = 26;
+      else if (hoursPerMonth >= 51) monthlyFlatRate = 18;
+      else if (hoursPerMonth >= 25) monthlyFlatRate = 10;
+      const annualFlatRate = monthlyFlatRate * 12;
+
+      const recommended = proportionalClaim > annualFlatRate ? 'proportional' : 'flat';
+      const recommendedAmount = recommended === 'proportional' ? proportionalClaim : annualFlatRate;
+
+      if (totalExpenses === 0 && hoursPerWeek === 0) {
+        return null;
+      }
+
+      return { recommendedAmount };
+    } catch {
+      return null;
+    }
+  }, [yearLabel]);
+
+  const useOfHomeAmount = useOfHomeData?.recommendedAmount || 0;
+
   const taxCalculation = useMemo(() => {
-    let totalIncome = 0;
-    let totalExpenses = 0;
+    // Use SA103F-style calculation matching TaxPaymentPlanner exactly
+    let turnover = 0;
+    let otherIncome = 0;
+
+    const expenses = {
+      costOfGoods: 0,
+      construction: 0,
+      wages: 0,
+      travel: 0,
+      rent: 0,
+      repairs: 0,
+      admin: 0,
+      advertising: 0,
+      interest: 0,
+      bankCharges: 0,
+      badDebts: 0,
+      professional: 0,
+      depreciation: 0,
+      other: 0,
+    };
 
     transactions.forEach(t => {
       if (t.type !== 'Business') return;
-      const amount = Number(t.amount);
+      const amount = Math.abs(Number(t.amount));
       
       if (t.businessType === 'Income') {
-        totalIncome += amount;
-      } else if (t.businessType === 'Expense') {
-        totalExpenses += Math.abs(amount);
+        if (t.category === 'Sales') {
+          turnover += amount;
+        } else {
+          otherIncome += amount;
+        }
+      } else if (t.businessType === 'Expense' && t.category) {
+        const categoryDef = SA103_EXPENSE_CATEGORIES.find(c => c.label === t.category);
+        if (categoryDef) {
+          switch (categoryDef.code) {
+            case '17': expenses.costOfGoods += amount; break;
+            case '18': expenses.construction += amount; break;
+            case '19': expenses.wages += amount; break;
+            case '20': expenses.travel += amount; break;
+            case '21': expenses.rent += amount; break;
+            case '22': expenses.repairs += amount; break;
+            case '23': expenses.admin += amount; break;
+            case '24': expenses.advertising += amount; break;
+            case '25': expenses.interest += amount; break;
+            case '26': expenses.bankCharges += amount; break;
+            case '27': expenses.badDebts += amount; break;
+            case '28': expenses.professional += amount; break;
+            case '29': expenses.depreciation += amount; break;
+            case '30': expenses.other += amount; break;
+          }
+        } else {
+          expenses.other += amount;
+        }
       }
     });
 
+    // Add Use of Home allowance to Box 21 (Rent, rates, power and insurance costs)
+    expenses.rent += useOfHomeAmount;
+    // Add mileage allowance to Box 20 (Car, van and travel expenses)
+    expenses.travel += mileageAllowance;
+
+    const totalIncome = turnover + otherIncome;
+    const totalExpenses = Object.values(expenses).reduce((a, b) => a + b, 0);
     const netProfit = totalIncome - totalExpenses;
     const personalAllowance = 12570;
     const taxableIncome = Math.max(0, netProfit - personalAllowance);
 
     let incomeTax = 0;
     if (taxableIncome > 0) {
-      const basicRate = Math.min(taxableIncome, 37700);
-      const higherRate = Math.min(Math.max(0, taxableIncome - 37700), 87440);
-      const additionalRate = Math.max(0, taxableIncome - 125140);
+      const basicRateLimit = 37700;
+      const basicTaxable = Math.min(taxableIncome, basicRateLimit);
+      incomeTax += basicTaxable * 0.20;
       
-      incomeTax = basicRate * 0.20 + higherRate * 0.40 + additionalRate * 0.45;
+      if (taxableIncome > basicRateLimit) {
+        const higherRateLimit = 125140 - 50270; // Higher rate band limit
+        const higherTaxable = Math.min(taxableIncome - basicRateLimit, higherRateLimit);
+        incomeTax += higherTaxable * 0.40;
+        
+        if (taxableIncome > basicRateLimit + higherRateLimit) {
+          const additionalTaxable = taxableIncome - basicRateLimit - higherRateLimit;
+          incomeTax += additionalTaxable * 0.45;
+        }
+      }
     }
 
     let class4NI = 0;
@@ -61,7 +172,7 @@ export function PaymentOnAccountReport({ transactions, yearLabel }: PaymentOnAcc
       class2NI: Math.round(class2NI),
       totalTax
     };
-  }, [transactions]);
+  }, [transactions, useOfHomeAmount, mileageAllowance]);
 
   const payments = useMemo(() => {
     const now = new Date();

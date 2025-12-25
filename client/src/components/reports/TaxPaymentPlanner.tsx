@@ -474,11 +474,12 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Payments on Account
+              Each Payment on Account
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">£{(paymentSchedule.firstPoA + paymentSchedule.secondPoA).toLocaleString()}</div>
+            <div className="text-2xl font-bold">£{paymentSchedule.firstPoA.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">50% of tax (×2 payments)</p>
           </CardContent>
         </Card>
         <Card className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
