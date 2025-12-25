@@ -197,19 +197,29 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
     const isIncome = t.amount > 0;
     const typeFilter = isIncome ? 'Income' : 'Expense';
     
-    // Build category list from database
+    // Build category list from database with full info
     const categories = dbCategories
       .filter(c => c.type === typeFilter)
-      .map(c => ({ code: c.code, label: c.label }));
+      .map(c => ({ 
+        code: c.code, 
+        label: c.label, 
+        hmrcBox: c.hmrcBox,
+        description: c.description 
+      }));
     
     // For expenses, also add the mileage category
     if (!isIncome) {
-      categories.push({ code: MILEAGE_CATEGORY.code, label: MILEAGE_CATEGORY.label });
+      categories.push({ 
+        code: MILEAGE_CATEGORY.code, 
+        label: MILEAGE_CATEGORY.label,
+        hmrcBox: '20',
+        description: 'Car, van and travel expenses (mileage allowance)'
+      });
     }
     
     // If current transaction has a category not in the list (legacy), add it so it displays
     if (t.category && !categories.some(c => c.label === t.category)) {
-      categories.unshift({ code: 'LEGACY', label: t.category });
+      categories.unshift({ code: 'LEGACY', label: t.category, hmrcBox: null, description: null });
     }
     
     return categories;
@@ -542,15 +552,23 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
-                      {getCategoriesForTransaction(t).map((cat) => (
-                        <SelectItem 
-                          key={cat.code} 
-                          value={cat.label}
-                          data-testid={`option-category-${cat.code}`}
-                        >
-                          <span className="font-medium">{cat.label}</span>
-                        </SelectItem>
-                      ))}
+                      {getCategoriesForTransaction(t).map((cat) => {
+                        const tooltipText = [
+                          cat.hmrcBox ? `SA103F Box ${cat.hmrcBox}` : null,
+                          cat.description
+                        ].filter(Boolean).join(' - ');
+                        
+                        return (
+                          <SelectItem 
+                            key={cat.code}
+                            value={cat.label}
+                            data-testid={`option-category-${cat.code}`}
+                            title={tooltipText || undefined}
+                          >
+                            <span className="font-medium">{cat.label}</span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 ) : (
