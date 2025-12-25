@@ -551,28 +551,31 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                     >
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[300px] overflow-y-auto">
-                      {getCategoriesForTransaction(t).map((cat) => {
-                        const tooltipText = [
-                          cat.hmrcBox ? `SA103F Box ${cat.hmrcBox}` : null,
-                          cat.description
-                        ].filter(Boolean).join(' - ');
-                        
-                        return (
-                          <SelectItem 
-                            key={cat.code}
-                            value={cat.label}
-                            data-testid={`option-category-${cat.code}`}
-                          >
-                            <span 
-                              className="font-medium w-full block" 
-                              title={tooltipText || undefined}
-                            >
-                              {cat.label}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
+                    <SelectContent className="max-h-[300px] overflow-y-auto w-[280px]">
+                      {getCategoriesForTransaction(t).map((cat) => (
+                        <SelectItem 
+                          key={cat.code}
+                          value={cat.label}
+                          data-testid={`option-category-${cat.code}`}
+                          className="py-2"
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{cat.label}</span>
+                              {cat.hmrcBox && (
+                                <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">
+                                  Box {cat.hmrcBox}
+                                </span>
+                              )}
+                            </div>
+                            {cat.description && (
+                              <span className="text-[10px] text-muted-foreground line-clamp-1">
+                                {cat.description}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 ) : (
