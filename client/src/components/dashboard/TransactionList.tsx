@@ -596,6 +596,22 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
             </DialogDescription>
           </DialogHeader>
           
+          {mileageTransaction && (
+            <div className="rounded-md bg-slate-50 dark:bg-slate-900 p-3 border border-slate-200 dark:border-slate-700">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">
+                  {format(parseISO(mileageTransaction.date), 'dd MMM yyyy')}
+                </span>
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  -£{Math.abs(Number(mileageTransaction.amount)).toFixed(2)}
+                </span>
+              </div>
+              <p className="text-sm font-medium mt-1 truncate">
+                {mileageTransaction.description || mileageTransaction.merchant}
+              </p>
+            </div>
+          )}
+          
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="mileage-description">Trip Description</Label>
