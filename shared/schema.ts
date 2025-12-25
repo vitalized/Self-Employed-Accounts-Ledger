@@ -111,6 +111,7 @@ export const categories = pgTable("categories", {
   label: text("label").notNull(),
   description: text("description"),
   type: text("type").notNull(), // 'Income' or 'Expense'
+  hmrcBox: text("hmrc_box"), // HMRC SA103F box number (17-30) for expense categories
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

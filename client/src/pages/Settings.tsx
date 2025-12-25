@@ -31,6 +31,7 @@ interface Category {
   label: string;
   description: string | null;
   type: string;
+  hmrcBox: string | null;
   createdAt: string;
 }
 
@@ -91,12 +92,14 @@ export default function Settings() {
     label: "",
     description: "",
     type: "Expense" as string,
+    hmrcBox: null as string | null,
   });
   const [editCategory, setEditCategory] = useState({
     code: "",
     label: "",
     description: "",
     type: "Expense" as string,
+    hmrcBox: null as string | null,
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; category: Category | null; transactionCount: number }>({
     open: false,
@@ -232,6 +235,15 @@ export default function Settings() {
       return;
     }
 
+    if (newCategory.type === "Expense" && !newCategory.hmrcBox) {
+      toast({
+        title: "HMRC Box Required",
+        description: "Expense categories must be linked to an HMRC SA103F box (17-30).",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const response = await fetch("/api/categories", {
         method: "POST",
@@ -242,7 +254,7 @@ export default function Settings() {
       if (response.ok) {
         const created = await response.json();
         setDbCategories([...dbCategories, created]);
-        setNewCategory({ code: "", label: "", description: "", type: "Expense" });
+        setNewCategory({ code: "", label: "", description: "", type: "Expense", hmrcBox: null });
         toast({
           title: "Category Created",
           description: `Added "${created.label}" category.`,
@@ -271,17 +283,27 @@ export default function Settings() {
       label: cat.label,
       description: cat.description || "",
       type: cat.type,
+      hmrcBox: cat.hmrcBox || null,
     });
   };
 
   const handleCancelEditCategory = () => {
     setEditingCategoryId(null);
-    setEditCategory({ code: "", label: "", description: "", type: "Expense" });
+    setEditCategory({ code: "", label: "", description: "", type: "Expense", hmrcBox: null });
   };
 
   const handleSaveEditCategory = async () => {
     if (!editingCategoryId || !editCategory.code.trim() || !editCategory.label.trim()) {
       toast({ title: "Code and Label Required", variant: "destructive" });
+      return;
+    }
+
+    if (editCategory.type === "Expense" && !editCategory.hmrcBox) {
+      toast({ 
+        title: "HMRC Box Required", 
+        description: "Expense categories must be linked to an HMRC SA103F box (17-30).",
+        variant: "destructive" 
+      });
       return;
     }
 
@@ -296,7 +318,7 @@ export default function Settings() {
         const updated = await response.json();
         setDbCategories(dbCategories.map(c => c.id === editingCategoryId ? updated : c));
         setEditingCategoryId(null);
-        setEditCategory({ code: "", label: "", description: "", type: "Expense" });
+        setEditCategory({ code: "", label: "", description: "", type: "Expense", hmrcBox: null });
         toast({ title: "Category Updated" });
       }
     } catch (error) {
@@ -846,7 +868,7 @@ export default function Settings() {
               <CardContent className="space-y-6">
                 <div className="space-y-4 border rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
                   <h4 className="font-medium text-sm">Add New Category</h4>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="cat-code">Code</Label>
                       <Input
@@ -871,7 +893,7 @@ export default function Settings() {
                       <Label>Type</Label>
                       <Select
                         value={newCategory.type}
-                        onValueChange={(value) => setNewCategory({ ...newCategory, type: value })}
+                        onValueChange={(value) => setNewCategory({ ...newCategory, type: value, hmrcBox: value === 'Income' ? null : newCategory.hmrcBox })}
                       >
                         <SelectTrigger data-testid="select-category-type">
                           <SelectValue />
@@ -882,16 +904,37 @@ export default function Settings() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  {newCategory.type === "Expense" && (
                     <div className="space-y-2">
-                      <Label htmlFor="cat-desc">Description</Label>
-                      <Input
-                        id="cat-desc"
-                        placeholder="Optional description"
-                        value={newCategory.description}
-                        onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
-                        data-testid="input-category-description"
-                      />
+                      <Label>HMRC Box (SA103F)</Label>
+                      <Select
+                        value={newCategory.hmrcBox || ""}
+                        onValueChange={(value) => setNewCategory({ ...newCategory, hmrcBox: value })}
+                      >
+                        <SelectTrigger data-testid="select-category-hmrc-box">
+                          <SelectValue placeholder="Select HMRC box..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SA103_EXPENSE_CATEGORIES.map((box) => (
+                            <SelectItem key={box.code} value={box.code}>
+                              Box {box.code}: {box.label} - {box.description}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">All expense categories must be linked to an official HMRC SA103F box (17-30)</p>
                     </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="cat-desc">Description (optional)</Label>
+                    <Input
+                      id="cat-desc"
+                      placeholder="Optional description"
+                      value={newCategory.description}
+                      onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                      data-testid="input-category-description"
+                    />
                   </div>
                   <Button onClick={handleAddCategory} className="mt-2" data-testid="button-add-category">
                     <Plus className="mr-2 h-4 w-4" />
@@ -932,7 +975,11 @@ export default function Settings() {
                                 />
                                 <Select
                                   value={editCategory.type}
-                                  onValueChange={(value) => setEditCategory({ ...editCategory, type: value })}
+                                  onValueChange={(value) => setEditCategory({ 
+                                    ...editCategory, 
+                                    type: value, 
+                                    hmrcBox: value === 'Income' ? null : editCategory.hmrcBox 
+                                  })}
                                 >
                                   <SelectTrigger data-testid={`select-edit-cat-type-${cat.id}`}>
                                     <SelectValue />
@@ -949,6 +996,26 @@ export default function Settings() {
                                   data-testid={`input-edit-cat-desc-${cat.id}`}
                                 />
                               </div>
+                              {editCategory.type === "Expense" && (
+                                <div className="space-y-2">
+                                  <Label className="text-xs">HMRC Box (SA103F)</Label>
+                                  <Select
+                                    value={editCategory.hmrcBox || ""}
+                                    onValueChange={(value) => setEditCategory({ ...editCategory, hmrcBox: value })}
+                                  >
+                                    <SelectTrigger data-testid={`select-edit-cat-hmrc-box-${cat.id}`}>
+                                      <SelectValue placeholder="Select HMRC box..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {SA103_EXPENSE_CATEGORIES.map((box) => (
+                                        <SelectItem key={box.code} value={box.code}>
+                                          Box {box.code}: {box.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                               <div className="flex gap-2">
                                 <Button size="sm" onClick={handleSaveEditCategory} data-testid={`button-save-category-${cat.id}`}>
                                   <Check className="mr-1 h-3 w-3" />
@@ -966,6 +1033,11 @@ export default function Settings() {
                                   {cat.code}
                                 </span>
                                 <span className="font-medium">{cat.label}</span>
+                                {cat.hmrcBox && (
+                                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                                    Box {cat.hmrcBox}
+                                  </span>
+                                )}
                                 {cat.description && (
                                   <span className="text-muted-foreground text-xs hidden md:inline">- {cat.description}</span>
                                 )}
@@ -1018,17 +1090,23 @@ export default function Settings() {
                                   value={editCategory.code}
                                   onChange={(e) => setEditCategory({ ...editCategory, code: e.target.value })}
                                   placeholder="Code"
+                                  data-testid={`input-edit-cat-code-${cat.id}`}
                                 />
                                 <Input
                                   value={editCategory.label}
                                   onChange={(e) => setEditCategory({ ...editCategory, label: e.target.value })}
                                   placeholder="Label"
+                                  data-testid={`input-edit-cat-label-${cat.id}`}
                                 />
                                 <Select
                                   value={editCategory.type}
-                                  onValueChange={(value) => setEditCategory({ ...editCategory, type: value })}
+                                  onValueChange={(value) => setEditCategory({ 
+                                    ...editCategory, 
+                                    type: value, 
+                                    hmrcBox: value === 'Income' ? null : editCategory.hmrcBox 
+                                  })}
                                 >
-                                  <SelectTrigger>
+                                  <SelectTrigger data-testid={`select-edit-cat-type-${cat.id}`}>
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1040,14 +1118,35 @@ export default function Settings() {
                                   value={editCategory.description}
                                   onChange={(e) => setEditCategory({ ...editCategory, description: e.target.value })}
                                   placeholder="Description"
+                                  data-testid={`input-edit-cat-desc-${cat.id}`}
                                 />
                               </div>
+                              {editCategory.type === "Expense" && (
+                                <div className="space-y-2">
+                                  <Label className="text-xs">HMRC Box (SA103F)</Label>
+                                  <Select
+                                    value={editCategory.hmrcBox || ""}
+                                    onValueChange={(value) => setEditCategory({ ...editCategory, hmrcBox: value })}
+                                  >
+                                    <SelectTrigger data-testid={`select-edit-cat-hmrc-box-${cat.id}`}>
+                                      <SelectValue placeholder="Select HMRC box..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {SA103_EXPENSE_CATEGORIES.map((box) => (
+                                        <SelectItem key={box.code} value={box.code}>
+                                          Box {box.code}: {box.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                               <div className="flex gap-2">
-                                <Button size="sm" onClick={handleSaveEditCategory}>
+                                <Button size="sm" onClick={handleSaveEditCategory} data-testid={`button-save-category-${cat.id}`}>
                                   <Check className="mr-1 h-3 w-3" />
                                   Save
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={handleCancelEditCategory}>
+                                <Button size="sm" variant="outline" onClick={handleCancelEditCategory} data-testid={`button-cancel-edit-category-${cat.id}`}>
                                   Cancel
                                 </Button>
                               </div>
