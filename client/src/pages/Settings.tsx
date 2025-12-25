@@ -71,6 +71,7 @@ export default function Settings() {
   const [loadingRules, setLoadingRules] = useState(true);
   const [applyingRules, setApplyingRules] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [ruleSearchQuery, setRuleSearchQuery] = useState("");
   const [newRule, setNewRule] = useState({
     keyword: "",
     type: "Personal",
@@ -728,13 +729,38 @@ export default function Settings() {
                     )}
                   </div>
                   
+                  {rules.length > 5 && (
+                    <div className="relative">
+                      <Input
+                        placeholder="Search rules by keyword..."
+                        value={ruleSearchQuery}
+                        onChange={(e) => setRuleSearchQuery(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-search-rules"
+                      />
+                      <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      {ruleSearchQuery && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                          onClick={() => setRuleSearchQuery("")}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  
                   {loadingRules ? (
                     <p className="text-sm text-muted-foreground">Loading rules...</p>
                   ) : rules.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No rules created yet. Add a rule above to get started.</p>
                   ) : (
                     <div className="space-y-2">
-                      {rules.map((rule) => (
+                      {rules
+                        .filter(rule => !ruleSearchQuery || rule.keyword.toLowerCase().includes(ruleSearchQuery.toLowerCase()))
+                        .map((rule) => (
                         <div 
                           key={rule.id} 
                           className="p-3 border rounded-md bg-white dark:bg-slate-950"
