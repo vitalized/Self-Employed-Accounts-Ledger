@@ -24,7 +24,8 @@ import {
   Calendar,
   Home,
   Clock,
-  PiggyBank
+  PiggyBank,
+  Tags
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -49,6 +50,7 @@ const reportSubItems = [
 ];
 
 const settingsSubItems = [
+  { href: "/settings/categories", label: "Categories", icon: Tags },
   { href: "/settings/rules", label: "Rules", icon: ListFilter },
   { href: "/settings/integrations", label: "Integrations", icon: Building },
   { href: "/settings/preferences", label: "Preferences", icon: Sliders },
