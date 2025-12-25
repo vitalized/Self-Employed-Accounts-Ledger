@@ -1,4 +1,4 @@
-import { users, transactions, settings, categorizationRules, transactionNotes, categories, excludedFingerprints, mileageTrips, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory, type InsertExcludedFingerprint, type ExcludedFingerprint, type MileageTrip, type InsertMileageTrip } from "@shared/schema";
+import { users, transactions, settings, categorizationRules, transactionNotes, categories, excludedFingerprints, mileageTrips, achievements, userAchievements, challenges, userChallenges, userStats, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory, type InsertExcludedFingerprint, type ExcludedFingerprint, type MileageTrip, type InsertMileageTrip, type Achievement, type UserAchievement, type Challenge, type UserChallenge, type UserStats } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, ilike, between, sql } from "drizzle-orm";
 
@@ -65,6 +65,21 @@ export interface IStorage {
   deleteMileageTrip(id: string): Promise<boolean>;
   deleteMileageTripByTransactionId(transactionId: string): Promise<boolean>;
   getMileageTotalForTaxYear(taxYearStart: Date, taxYearEnd: Date): Promise<number>;
+  
+  // Gamification methods
+  getAchievements(): Promise<Achievement[]>;
+  getUserAchievements(): Promise<(UserAchievement & { achievement: Achievement })[]>;
+  unlockAchievement(achievementId: string): Promise<UserAchievement>;
+  hasAchievement(achievementId: string): Promise<boolean>;
+  getChallenges(): Promise<Challenge[]>;
+  getActiveChallenges(): Promise<Challenge[]>;
+  getUserChallenges(): Promise<(UserChallenge & { challenge: Challenge })[]>;
+  startChallenge(challengeId: string): Promise<UserChallenge>;
+  updateChallengeProgress(challengeId: string, value: number): Promise<UserChallenge | undefined>;
+  completeChallenge(challengeId: string): Promise<UserChallenge | undefined>;
+  getUserStats(): Promise<UserStats>;
+  addPoints(points: number): Promise<UserStats>;
+  updateStreak(): Promise<UserStats>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -566,6 +581,138 @@ export class DatabaseStorage implements IStorage {
       .from(mileageTrips)
       .where(between(mileageTrips.date, taxYearStart, taxYearEnd));
     return parseFloat(result[0]?.total || '0');
+  }
+
+  // Gamification methods
+  async getAchievements(): Promise<Achievement[]> {
+    return await db.select().from(achievements).orderBy(achievements.category, achievements.points);
+  }
+
+  async getUserAchievements(): Promise<(UserAchievement & { achievement: Achievement })[]> {
+    const results = await db.select()
+      .from(userAchievements)
+      .innerJoin(achievements, eq(userAchievements.achievementId, achievements.id));
+    return results.map(r => ({
+      ...r.user_achievements,
+      achievement: r.achievements
+    }));
+  }
+
+  async unlockAchievement(achievementId: string): Promise<UserAchievement> {
+    const [result] = await db.insert(userAchievements)
+      .values({ achievementId })
+      .returning();
+    return result;
+  }
+
+  async hasAchievement(achievementId: string): Promise<boolean> {
+    const [result] = await db.select()
+      .from(userAchievements)
+      .where(eq(userAchievements.achievementId, achievementId));
+    return !!result;
+  }
+
+  async getChallenges(): Promise<Challenge[]> {
+    return await db.select().from(challenges).orderBy(challenges.challengeType);
+  }
+
+  async getActiveChallenges(): Promise<Challenge[]> {
+    return await db.select()
+      .from(challenges)
+      .where(eq(challenges.isActive, 1));
+  }
+
+  async getUserChallenges(): Promise<(UserChallenge & { challenge: Challenge })[]> {
+    const results = await db.select()
+      .from(userChallenges)
+      .innerJoin(challenges, eq(userChallenges.challengeId, challenges.id));
+    return results.map(r => ({
+      ...r.user_challenges,
+      challenge: r.challenges
+    }));
+  }
+
+  async startChallenge(challengeId: string): Promise<UserChallenge> {
+    const [result] = await db.insert(userChallenges)
+      .values({ challengeId, currentValue: 0, isCompleted: 0 })
+      .returning();
+    return result;
+  }
+
+  async updateChallengeProgress(challengeId: string, value: number): Promise<UserChallenge | undefined> {
+    const [result] = await db.update(userChallenges)
+      .set({ currentValue: value })
+      .where(eq(userChallenges.challengeId, challengeId))
+      .returning();
+    return result;
+  }
+
+  async completeChallenge(challengeId: string): Promise<UserChallenge | undefined> {
+    const [result] = await db.update(userChallenges)
+      .set({ isCompleted: 1, completedAt: new Date() })
+      .where(eq(userChallenges.challengeId, challengeId))
+      .returning();
+    return result;
+  }
+
+  async getUserStats(): Promise<UserStats> {
+    const [stats] = await db.select().from(userStats);
+    if (!stats) {
+      const [newStats] = await db.insert(userStats)
+        .values({ totalPoints: 0, level: 1, streak: 0 })
+        .returning();
+      return newStats;
+    }
+    return stats;
+  }
+
+  async addPoints(points: number): Promise<UserStats> {
+    const currentStats = await this.getUserStats();
+    const newPoints = currentStats.totalPoints + points;
+    const newLevel = Math.floor(newPoints / 100) + 1;
+    
+    const [result] = await db.update(userStats)
+      .set({ 
+        totalPoints: newPoints, 
+        level: newLevel,
+        updatedAt: new Date()
+      })
+      .where(eq(userStats.id, currentStats.id))
+      .returning();
+    return result;
+  }
+
+  async updateStreak(): Promise<UserStats> {
+    const currentStats = await this.getUserStats();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let newStreak = currentStats.streak;
+    
+    if (currentStats.lastActivityDate) {
+      const lastDate = new Date(currentStats.lastActivityDate);
+      lastDate.setHours(0, 0, 0, 0);
+      
+      const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        newStreak += 1;
+      } else if (diffDays > 1) {
+        newStreak = 1;
+      }
+    } else {
+      newStreak = 1;
+    }
+    
+    const [result] = await db.update(userStats)
+      .set({
+        streak: newStreak,
+        lastActivityDate: today,
+        updatedAt: new Date()
+      })
+      .where(eq(userStats.id, currentStats.id))
+      .returning();
+    return result;
   }
 }
 
