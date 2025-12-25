@@ -1,14 +1,15 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, FileText, Car, Home } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Car, Home, ChevronRight } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES, getHMRCBoxCode } from "@shared/categories";
 import * as XLSX from "xlsx";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { parseISO, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface SA103FReportProps {
   transactions: Transaction[];
@@ -521,27 +522,126 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
     }
   };
 
-  const Row = ({ label, boxAllowable, valAllowable, boxDisallowable, valDisallowable, isTotal = false }: any) => (
-    <div className={`flex items-center py-2 text-sm ${isTotal ? 'border-t border-b-2 border-solid border-gray-900 dark:border-gray-100 font-bold py-3 text-base' : 'border-b border-dashed border-gray-100 dark:border-gray-800'}`}>
-      <div className="flex-1 pr-4">{label}</div>
-      <div className="w-24 text-right flex items-center justify-end gap-2">
-        {valAllowable !== undefined && (
-          <>
+  // Filter transactions by box code
+  const getTransactionsForBox = (boxCode: string) => {
+    return transactions.filter(t => {
+      if (t.type !== 'Business' || t.businessType !== 'Expense' || !t.category) return false;
+      return getHMRCBoxCode(t.category) === boxCode;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
+  // Expandable expense row with accordion
+  const ExpenseRow = ({ label, boxAllowable, valAllowable, boxDisallowable, valDisallowable, isTotal = false }: any) => {
+    const boxTransactions = isTotal ? [] : getTransactionsForBox(boxAllowable);
+    const hasTransactions = boxTransactions.length > 0;
+    const hasValue = valAllowable > 0 || valDisallowable > 0;
+    const transactionTotal = boxTransactions.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+    const hasAdjustments = hasValue && valAllowable > transactionTotal;
+    const adjustmentAmount = Math.round(valAllowable - transactionTotal);
+    
+    if (isTotal) {
+      return (
+        <div className="flex items-center py-3 text-base border-t border-b-2 border-solid border-gray-900 dark:border-gray-100 font-bold">
+          <div className="flex-1 pr-4">{label}</div>
+          <div className="w-24 text-right flex items-center justify-end gap-2">
             <span>£{valAllowable.toLocaleString()}</span>
             {boxAllowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxAllowable}</span>}
-          </>
-        )}
-      </div>
-      <div className="w-24 text-right flex items-center justify-end gap-2 ml-4">
-        {valDisallowable !== undefined && (
-          <>
+          </div>
+          <div className="w-24 text-right flex items-center justify-end gap-2 ml-4">
             <span>£{valDisallowable.toLocaleString()}</span>
             {boxDisallowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxDisallowable}</span>}
-          </>
-        )}
-      </div>
-    </div>
-  );
+          </div>
+        </div>
+      );
+    }
+    
+    // No transactions and no value = muted row
+    if (!hasTransactions && !hasValue) {
+      return (
+        <div className="flex items-center py-2 text-sm border-b border-dashed border-gray-100 dark:border-gray-800">
+          <div className="flex-1 pr-4 text-muted-foreground">{label}</div>
+          <div className="w-24 text-right flex items-center justify-end gap-2">
+            <span className="text-muted-foreground">£{valAllowable.toLocaleString()}</span>
+            {boxAllowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxAllowable}</span>}
+          </div>
+          <div className="w-24 text-right flex items-center justify-end gap-2 ml-4">
+            <span className="text-muted-foreground">£{valDisallowable.toLocaleString()}</span>
+            {boxDisallowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxDisallowable}</span>}
+          </div>
+        </div>
+      );
+    }
+    
+    // Has value but no transactions (synthetic adjustments only) = show value but not expandable
+    if (!hasTransactions && hasValue) {
+      return (
+        <div className="flex items-center py-2 text-sm border-b border-dashed border-gray-100 dark:border-gray-800">
+          <div className="flex-1 pr-4">
+            {label}
+            <span className="ml-2 text-xs text-muted-foreground">(includes adjustments)</span>
+          </div>
+          <div className="w-24 text-right flex items-center justify-end gap-2">
+            <span>£{valAllowable.toLocaleString()}</span>
+            {boxAllowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxAllowable}</span>}
+          </div>
+          <div className="w-24 text-right flex items-center justify-end gap-2 ml-4">
+            <span>£{valDisallowable.toLocaleString()}</span>
+            {boxDisallowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxDisallowable}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value={boxAllowable} className="border-b border-dashed border-gray-100 dark:border-gray-800">
+          <AccordionTrigger className="py-2 hover:no-underline [&[data-state=open]>div>.chevron]:rotate-90">
+            <div className="flex items-center w-full text-sm">
+              <ChevronRight className="h-4 w-4 mr-1 shrink-0 text-muted-foreground transition-transform duration-200 chevron" />
+              <div className="flex-1 pr-4 text-left font-medium">
+                {label}
+                <span className="ml-2 text-xs text-muted-foreground font-normal">({boxTransactions.length} transactions)</span>
+              </div>
+              <div className="w-24 text-right flex items-center justify-end gap-2">
+                <span>£{valAllowable.toLocaleString()}</span>
+                {boxAllowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxAllowable}</span>}
+              </div>
+              <div className="w-24 text-right flex items-center justify-end gap-2 ml-4">
+                <span>£{valDisallowable.toLocaleString()}</span>
+                {boxDisallowable && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 rounded w-5 text-center">{boxDisallowable}</span>}
+              </div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="ml-5 mt-1 mb-2 space-y-1 bg-slate-50 dark:bg-slate-900/50 rounded-md p-3 max-h-64 overflow-y-auto">
+              {boxTransactions.map((t) => (
+                <div key={t.id} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200 dark:border-slate-700 last:border-0">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="text-muted-foreground shrink-0 w-20">{format(parseISO(t.date), 'dd MMM yyyy')}</span>
+                    <span className="truncate">{t.description || t.merchant}</span>
+                  </div>
+                  <span className="font-medium text-red-600 dark:text-red-400 shrink-0 ml-2">
+                    -£{Math.abs(Number(t.amount)).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+              {hasAdjustments && adjustmentAmount > 0 && (
+                <div className="flex items-center justify-between text-xs py-1.5 border-t border-slate-300 dark:border-slate-600 mt-2 pt-2">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="text-muted-foreground shrink-0 w-20">Adjustment</span>
+                    <span className="italic text-muted-foreground">Use of Home / Mileage allowance</span>
+                  </div>
+                  <span className="font-medium text-green-600 dark:text-green-400 shrink-0 ml-2">
+                    +£{adjustmentAmount.toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    );
+  };
 
   const IncomeRow = ({ label, box, value, isTotal = false }: { label: string; box?: string; value: number; isTotal?: boolean }) => (
     <div className={`flex items-center py-2 text-sm ${isTotal ? 'border-t border-b-2 border-solid border-gray-900 dark:border-gray-100 font-bold py-3 text-base' : 'border-b border-dashed border-gray-100 dark:border-gray-800'}`}>
@@ -604,21 +704,21 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
                     <div className="w-24 text-right">Disallowable</div>
                   </div>
                 </div>
-                <Row label="Cost of goods bought for resale or goods used" valAllowable={data.expenses.costOfGoods} boxAllowable="17" valDisallowable={0} boxDisallowable="32" />
-                <Row label="Construction industry - payments to subcontractors" valAllowable={data.expenses.construction} boxAllowable="18" valDisallowable={0} boxDisallowable="33" />
-                <Row label="Wages, salaries and other staff costs" valAllowable={data.expenses.wages} boxAllowable="19" valDisallowable={0} boxDisallowable="34" />
-                <Row label="Car, van and travel expenses" valAllowable={data.expenses.travel} boxAllowable="20" valDisallowable={data.disallowable.travel} boxDisallowable="35" />
-                <Row label={useOfHomeData && useOfHomeData.recommendedAmount > 0 ? "Rent, rates, power and insurance costs (incl. Use of Home)" : "Rent, rates, power and insurance costs"} valAllowable={data.expenses.rent} boxAllowable="21" valDisallowable={0} boxDisallowable="36" />
-                <Row label="Repairs and renewals of property and equipment" valAllowable={data.expenses.repairs} boxAllowable="22" valDisallowable={0} boxDisallowable="37" />
-                <Row label="Phone, fax, stationery and other office costs" valAllowable={data.expenses.admin} boxAllowable="23" valDisallowable={0} boxDisallowable="38" />
-                <Row label="Advertising and business entertainment costs" valAllowable={data.expenses.advertising} boxAllowable="24" valDisallowable={data.disallowable.advertising} boxDisallowable="39" />
-                <Row label="Interest on bank and other loans" valAllowable={data.expenses.interest} boxAllowable="25" valDisallowable={0} boxDisallowable="40" />
-                <Row label="Bank, credit card and other financial charges" valAllowable={data.expenses.bankCharges} boxAllowable="26" valDisallowable={0} boxDisallowable="41" />
-                <Row label="Irrecoverable debts written off" valAllowable={data.expenses.badDebts} boxAllowable="27" valDisallowable={0} boxDisallowable="42" />
-                <Row label="Accountancy, legal and other professional fees" valAllowable={data.expenses.professional} boxAllowable="28" valDisallowable={0} boxDisallowable="43" />
-                <Row label="Depreciation and loss/profit on sale of assets" valAllowable={data.expenses.depreciation} boxAllowable="29" valDisallowable={0} boxDisallowable="44" />
-                <Row label="Other business expenses" valAllowable={data.expenses.other} boxAllowable="30" valDisallowable={data.disallowable.other} boxDisallowable="45" />
-                <Row label="TOTAL EXPENSES" valAllowable={data.totalExpenses} boxAllowable="31" valDisallowable={data.totalDisallowable} boxDisallowable="46" isTotal />
+                <ExpenseRow label="Cost of goods bought for resale or goods used" valAllowable={data.expenses.costOfGoods} boxAllowable="17" valDisallowable={0} boxDisallowable="32" />
+                <ExpenseRow label="Construction industry - payments to subcontractors" valAllowable={data.expenses.construction} boxAllowable="18" valDisallowable={0} boxDisallowable="33" />
+                <ExpenseRow label="Wages, salaries and other staff costs" valAllowable={data.expenses.wages} boxAllowable="19" valDisallowable={0} boxDisallowable="34" />
+                <ExpenseRow label="Car, van and travel expenses" valAllowable={data.expenses.travel} boxAllowable="20" valDisallowable={data.disallowable.travel} boxDisallowable="35" />
+                <ExpenseRow label={useOfHomeData && useOfHomeData.recommendedAmount > 0 ? "Rent, rates, power and insurance costs (incl. Use of Home)" : "Rent, rates, power and insurance costs"} valAllowable={data.expenses.rent} boxAllowable="21" valDisallowable={0} boxDisallowable="36" />
+                <ExpenseRow label="Repairs and renewals of property and equipment" valAllowable={data.expenses.repairs} boxAllowable="22" valDisallowable={0} boxDisallowable="37" />
+                <ExpenseRow label="Phone, fax, stationery and other office costs" valAllowable={data.expenses.admin} boxAllowable="23" valDisallowable={0} boxDisallowable="38" />
+                <ExpenseRow label="Advertising and business entertainment costs" valAllowable={data.expenses.advertising} boxAllowable="24" valDisallowable={data.disallowable.advertising} boxDisallowable="39" />
+                <ExpenseRow label="Interest on bank and other loans" valAllowable={data.expenses.interest} boxAllowable="25" valDisallowable={0} boxDisallowable="40" />
+                <ExpenseRow label="Bank, credit card and other financial charges" valAllowable={data.expenses.bankCharges} boxAllowable="26" valDisallowable={0} boxDisallowable="41" />
+                <ExpenseRow label="Irrecoverable debts written off" valAllowable={data.expenses.badDebts} boxAllowable="27" valDisallowable={0} boxDisallowable="42" />
+                <ExpenseRow label="Accountancy, legal and other professional fees" valAllowable={data.expenses.professional} boxAllowable="28" valDisallowable={0} boxDisallowable="43" />
+                <ExpenseRow label="Depreciation and loss/profit on sale of assets" valAllowable={data.expenses.depreciation} boxAllowable="29" valDisallowable={0} boxDisallowable="44" />
+                <ExpenseRow label="Other business expenses" valAllowable={data.expenses.other} boxAllowable="30" valDisallowable={data.disallowable.other} boxDisallowable="45" />
+                <ExpenseRow label="TOTAL EXPENSES" valAllowable={data.totalExpenses} boxAllowable="31" valDisallowable={data.totalDisallowable} boxDisallowable="46" isTotal />
               </div>
             </CardContent>
           </Card>
