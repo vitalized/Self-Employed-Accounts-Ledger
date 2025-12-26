@@ -156,6 +156,9 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
           otherIncome += amount;
         }
       } else if (t.businessType === 'Expense' && t.category) {
+        // Skip "Covered by Mileage Allowance" - these costs are replaced by the mileage allowance claim
+        if (t.category === 'Covered by Mileage Allowance') return;
+        
         // Use the category's hmrcBox field directly from the database
         const boxCode = getBoxCode(t.category);
         switch (boxCode) {
