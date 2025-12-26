@@ -556,6 +556,8 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
   const getTransactionsForBox = (boxCode: string) => {
     return transactions.filter(t => {
       if (t.type !== 'Business' || t.businessType !== 'Expense' || !t.category) return false;
+      // Exclude "Covered by Mileage Allowance" - these costs are replaced by the mileage allowance claim
+      if (t.category === 'Covered by Mileage Allowance') return false;
       return getBoxCode(t.category) === boxCode;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   };
