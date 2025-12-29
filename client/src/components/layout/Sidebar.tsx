@@ -96,7 +96,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="flex h-16 items-center border-b border-sidebar-border px-3 justify-between">
         <div className={cn("flex items-center", collapsed && "justify-center w-full")}>
           <Briefcase className={cn("h-6 w-6 text-primary", !collapsed && "mr-2")} />
-          {!collapsed && <span className="text-lg font-bold">TaxTrack</span>}
+          {!collapsed && (
+            <div className="flex flex-col leading-tight">
+              <span className="text-lg font-bold">Viatlized</span>
+              <span className="text-xs text-muted-foreground">SA103F Accounts</span>
+            </div>
+          )}
         </div>
         {!collapsed && (
           <button

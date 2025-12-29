@@ -1,8 +1,8 @@
-# TaxTrack - Business Finance Manager
+# Viatlized - SA103F Accounts
 
 ## Overview
 
-TaxTrack is a business finance management application designed to help UK sole traders and small business owners track transactions, categorize expenses, and estimate tax liabilities. The app provides a dashboard for viewing financial summaries, managing transactions, generating reports, and calculating UK income tax estimates.
+Viatlized is a UK sole trader accounting application designed to help small business owners track transactions, categorize expenses using HMRC SA103F box codes, and estimate tax liabilities. The app provides a dashboard for viewing financial summaries, managing transactions, generating reports, and calculating UK income tax estimates.
 
 ## User Preferences
 
