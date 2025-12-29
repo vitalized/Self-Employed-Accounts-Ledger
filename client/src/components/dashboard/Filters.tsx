@@ -52,8 +52,8 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
 
   return (
     <div className="mb-6 space-y-3">
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-sm min-w-0">
+      <div className="flex items-center gap-2 sm:gap-3 w-full">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
@@ -65,95 +65,95 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           />
         </div>
         
-        <Select 
-          value={filterState.dateRange} 
-          onValueChange={(value) => onFilterChange({ dateRange: value as DateFilter })}
-        >
-          <SelectTrigger className="w-[160px] sm:w-[180px] h-9" data-testid="select-date-range">
-            <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
-            <SelectValue placeholder="Select period" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[400px]">
-            <SelectGroup>
-              <SelectLabel>Quick Filters</SelectLabel>
-              <SelectItem value="this-month">This Month</SelectItem>
-              <SelectItem value="last-month">Last Month</SelectItem>
-              <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-              <SelectItem value="custom">Custom Date</SelectItem>
-            </SelectGroup>
-            {taxYears.length > 0 && (
-              <>
-                <SelectSeparator />
-                <SelectGroup>
-                  <SelectLabel>Tax Year {taxYears[0]}</SelectLabel>
-                  <SelectItem value={`tax-year-${taxYears[0]}`}>Current Tax Year (6 Apr - 5 Apr)</SelectItem>
-                  <SelectItem value={`mtd-q1-${taxYears[0]}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
-                  <SelectItem value={`mtd-q2-${taxYears[0]}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
-                  <SelectItem value={`mtd-q3-${taxYears[0]}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
-                  <SelectItem value={`mtd-q4-${taxYears[0]}`}>MTD Q4 (6 Apr - 5 Apr)</SelectItem>
-                </SelectGroup>
-                <SelectSeparator />
-              </>
-            )}
-            {taxYears.slice(1).map((taxYear) => (
-              <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>Tax Year {taxYear}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 shrink-0">
+          {filterState.dateRange === 'custom' && (
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "w-[100px] h-9 justify-start text-left font-normal text-sm",
+                      !filterState.customStartDate && "text-muted-foreground"
+                    )}
+                  >
+                    {filterState.customStartDate ? format(filterState.customStartDate, "dd/MM/yy") : "Start"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={filterState.customStartDate}
+                    onSelect={(date) => onFilterChange({ customStartDate: date })}
+                    defaultMonth={filterState.customStartDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <span className="text-muted-foreground text-sm">to</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "w-[100px] h-9 justify-start text-left font-normal text-sm",
+                      !filterState.customEndDate && "text-muted-foreground"
+                    )}
+                  >
+                    {filterState.customEndDate ? format(filterState.customEndDate, "dd/MM/yy") : "End"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={filterState.customEndDate}
+                    onSelect={(date) => onFilterChange({ customEndDate: date })}
+                    defaultMonth={filterState.customEndDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
 
-        {filterState.dateRange === 'custom' && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "flex-1 sm:flex-none sm:w-[100px] h-9 justify-start text-left font-normal text-sm",
-                    !filterState.customStartDate && "text-muted-foreground"
-                  )}
-                >
-                  {filterState.customStartDate ? format(filterState.customStartDate, "dd/MM/yy") : "Start"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={filterState.customStartDate}
-                  onSelect={(date) => onFilterChange({ customStartDate: date })}
-                  defaultMonth={filterState.customStartDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            <span className="text-muted-foreground text-sm">to</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "flex-1 sm:flex-none sm:w-[100px] h-9 justify-start text-left font-normal text-sm",
-                    !filterState.customEndDate && "text-muted-foreground"
-                  )}
-                >
-                  {filterState.customEndDate ? format(filterState.customEndDate, "dd/MM/yy") : "End"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={filterState.customEndDate}
-                  onSelect={(date) => onFilterChange({ customEndDate: date })}
-                  defaultMonth={filterState.customEndDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
+          <Select 
+            value={filterState.dateRange} 
+            onValueChange={(value) => onFilterChange({ dateRange: value as DateFilter })}
+          >
+            <SelectTrigger className="w-[160px] sm:w-[180px] h-9" data-testid="select-date-range">
+              <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[400px]">
+              <SelectGroup>
+                <SelectLabel>Quick Filters</SelectLabel>
+                <SelectItem value="this-month">This Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                <SelectItem value="custom">Custom Date</SelectItem>
+              </SelectGroup>
+              {taxYears.length > 0 && (
+                <>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Tax Year {taxYears[0]}</SelectLabel>
+                    <SelectItem value={`tax-year-${taxYears[0]}`}>Current Tax Year (6 Apr - 5 Apr)</SelectItem>
+                    <SelectItem value={`mtd-q1-${taxYears[0]}`}>MTD Q1 (6 Apr - 5 Jul)</SelectItem>
+                    <SelectItem value={`mtd-q2-${taxYears[0]}`}>MTD Q2 (6 Apr - 5 Oct)</SelectItem>
+                    <SelectItem value={`mtd-q3-${taxYears[0]}`}>MTD Q3 (6 Apr - 5 Jan)</SelectItem>
+                    <SelectItem value={`mtd-q4-${taxYears[0]}`}>MTD Q4 (6 Apr - 5 Apr)</SelectItem>
+                  </SelectGroup>
+                  <SelectSeparator />
+                </>
+              )}
+              {taxYears.slice(1).map((taxYear) => (
+                <SelectItem key={taxYear} value={`tax-year-${taxYear}`}>Tax Year {taxYear}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <div className="ml-auto sm:ml-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-9" data-testid="button-actions-menu">
