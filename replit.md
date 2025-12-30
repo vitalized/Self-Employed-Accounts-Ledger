@@ -1,4 +1,4 @@
-# Viatlized - SA103F Accounts
+# Viatlized - SA103F Self-Employment Accounts
 
 ## Overview
 

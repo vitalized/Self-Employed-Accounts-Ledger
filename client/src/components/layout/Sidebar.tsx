@@ -99,7 +99,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {!collapsed && (
             <div className="flex flex-col leading-tight">
               <span className="text-lg font-bold">Viatlized</span>
-              <span className="text-xs text-muted-foreground">SA103F Accounts</span>
+              <span className="text-xs text-muted-foreground">SA103F Self-Employment</span>
             </div>
           )}
         </div>
