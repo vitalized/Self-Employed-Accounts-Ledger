@@ -10,7 +10,7 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   profileImageUrl: text("profile_image_url"),
   role: text("role").notNull().default('accountant'), // 'admin' | 'accountant'
-  twoFactorMethod: text("two_factor_method"), // 'email' | null
+  twoFactorMethod: text("two_factor_method"), // 'email' | 'webauthn' | null
   isActive: boolean("is_active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -54,6 +54,18 @@ export const sessions = pgTable("sessions", {
   expire: timestamp("expire").notNull(),
 });
 
+export const passkeyCredentials = pgTable("passkey_credentials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  credentialId: text("credential_id").notNull().unique(),
+  publicKey: text("public_key").notNull(),
+  counter: integer("counter").notNull().default(0),
+  transports: text("transports").array().default(sql`ARRAY[]::text[]`),
+  deviceName: text("device_name"),
+  deviceType: text("device_type"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -77,6 +89,11 @@ export const insertEmailVerificationCodeSchema = createInsertSchema(emailVerific
 
 export const insertSessionSchema = createInsertSchema(sessions);
 
+export const insertPasskeyCredentialSchema = createInsertSchema(passkeyCredentials).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -91,3 +108,6 @@ export type EmailVerificationCode = typeof emailVerificationCodes.$inferSelect;
 
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
+
+export type InsertPasskeyCredential = z.infer<typeof insertPasskeyCredentialSchema>;
+export type PasskeyCredential = typeof passkeyCredentials.$inferSelect;
