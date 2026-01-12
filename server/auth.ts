@@ -1,9 +1,19 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "./db";
-import { users, passwordCredentials, authSessions, emailVerificationCodes, type User, type InsertUser, type AuthSession } from "@shared/schema";
+import { users, passwordCredentials, authSessions, emailVerificationCodes, passkeyCredentials, type User, type InsertUser, type AuthSession, type PasskeyCredential } from "@shared/schema";
 import { eq, and, gt } from "drizzle-orm";
 import type { Request, Response, NextFunction } from "express";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from "@simplewebauthn/server";
+import type {
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from "@simplewebauthn/server";
 
 const SALT_ROUNDS = 12;
 const SESSION_EXPIRY_HOURS = 24;
@@ -176,6 +186,180 @@ export class AuthService {
       .update(users)
       .set({ lastLoginAt: new Date() })
       .where(eq(users.id, userId));
+  }
+
+  async update2FAMethod(userId: string, method: "email" | "webauthn" | null): Promise<void> {
+    await db
+      .update(users)
+      .set({ twoFactorMethod: method })
+      .where(eq(users.id, userId));
+  }
+
+  // WebAuthn / Passkey methods
+  getRelyingPartyInfo() {
+    const rpID = process.env.REPLIT_DOMAINS 
+      ? process.env.REPLIT_DOMAINS.split(",")[0]
+      : process.env.REPLIT_DEV_DOMAIN || "localhost";
+    const rpName = "Viatlized";
+    const origin = rpID === "localhost" ? "http://localhost:5000" : `https://${rpID}`;
+    return { rpID, rpName, origin };
+  }
+
+  async getPasskeyCredentials(userId: string): Promise<PasskeyCredential[]> {
+    return db
+      .select()
+      .from(passkeyCredentials)
+      .where(eq(passkeyCredentials.userId, userId));
+  }
+
+  async getPasskeyCredentialById(credentialId: string): Promise<PasskeyCredential | undefined> {
+    const [credential] = await db
+      .select()
+      .from(passkeyCredentials)
+      .where(eq(passkeyCredentials.credentialId, credentialId));
+    return credential || undefined;
+  }
+
+  async savePasskeyCredential(
+    userId: string,
+    credentialId: string,
+    publicKey: string,
+    counter: number,
+    transports: string[],
+    deviceName?: string,
+    deviceType?: string
+  ): Promise<PasskeyCredential> {
+    const [credential] = await db
+      .insert(passkeyCredentials)
+      .values({
+        userId,
+        credentialId,
+        publicKey,
+        counter,
+        transports,
+        deviceName,
+        deviceType,
+      })
+      .returning();
+    return credential;
+  }
+
+  async updatePasskeyCounter(credentialId: string, counter: number): Promise<void> {
+    await db
+      .update(passkeyCredentials)
+      .set({ counter })
+      .where(eq(passkeyCredentials.credentialId, credentialId));
+  }
+
+  async deletePasskeyCredential(credentialId: string): Promise<void> {
+    await db
+      .delete(passkeyCredentials)
+      .where(eq(passkeyCredentials.id, credentialId));
+  }
+
+  async generateWebAuthnRegistrationOptions(user: User) {
+    const { rpID, rpName } = this.getRelyingPartyInfo();
+    const existingCredentials = await this.getPasskeyCredentials(user.id);
+    
+    const options = await generateRegistrationOptions({
+      rpName,
+      rpID,
+      userID: new TextEncoder().encode(user.id),
+      userName: user.email,
+      userDisplayName: `${user.firstName} ${user.lastName}`,
+      attestationType: "none",
+      excludeCredentials: existingCredentials.map(cred => ({
+        id: cred.credentialId,
+        transports: cred.transports as any,
+      })),
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "preferred",
+      },
+    });
+
+    return options;
+  }
+
+  async verifyWebAuthnRegistration(
+    user: User,
+    response: RegistrationResponseJSON,
+    expectedChallenge: string,
+    deviceName?: string
+  ) {
+    const { rpID, origin } = this.getRelyingPartyInfo();
+    
+    const verification = await verifyRegistrationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+    });
+
+    if (verification.verified && verification.registrationInfo) {
+      const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+      
+      await this.savePasskeyCredential(
+        user.id,
+        credential.id,
+        Buffer.from(credential.publicKey).toString("base64"),
+        credential.counter,
+        response.response.transports || [],
+        deviceName,
+        credentialDeviceType
+      );
+
+      await this.update2FAMethod(user.id, "webauthn");
+    }
+
+    return verification;
+  }
+
+  async generateWebAuthnAuthenticationOptions(user: User) {
+    const { rpID } = this.getRelyingPartyInfo();
+    const credentials = await this.getPasskeyCredentials(user.id);
+    
+    const options = await generateAuthenticationOptions({
+      rpID,
+      allowCredentials: credentials.map(cred => ({
+        id: cred.credentialId,
+        transports: cred.transports as any,
+      })),
+      userVerification: "preferred",
+    });
+
+    return options;
+  }
+
+  async verifyWebAuthnAuthentication(
+    response: AuthenticationResponseJSON,
+    expectedChallenge: string
+  ) {
+    const { rpID, origin } = this.getRelyingPartyInfo();
+    
+    const credential = await this.getPasskeyCredentialById(response.id);
+    if (!credential) {
+      throw new Error("Credential not found");
+    }
+
+    const verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      credential: {
+        id: credential.credentialId,
+        publicKey: new Uint8Array(Buffer.from(credential.publicKey, "base64")),
+        counter: credential.counter,
+        transports: credential.transports as any,
+      },
+    });
+
+    if (verification.verified) {
+      await this.updatePasskeyCounter(credential.credentialId, verification.authenticationInfo.newCounter);
+    }
+
+    return { verification, userId: credential.userId };
   }
 }
 

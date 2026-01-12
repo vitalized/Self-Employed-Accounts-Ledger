@@ -8,6 +8,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   require2FA: boolean;
+  needs2FASetup: boolean;
 }
 
 interface LoginResult {
@@ -45,6 +46,7 @@ export function useAuth() {
     isLoading: true,
     isAuthenticated: false,
     require2FA: false,
+    needs2FASetup: false,
   });
 
   const fetchUser = useCallback(async () => {
@@ -56,6 +58,7 @@ export function useAuth() {
         isLoading: false,
         isAuthenticated: false,
         require2FA: false,
+        needs2FASetup: false,
       });
       return;
     }
@@ -70,6 +73,7 @@ export function useAuth() {
           isLoading: false,
           isAuthenticated: false,
           require2FA: false,
+          needs2FASetup: false,
         });
         return;
       }
@@ -84,6 +88,7 @@ export function useAuth() {
             isLoading: false,
             isAuthenticated: true,
             require2FA: true,
+            needs2FASetup: false,
           });
           return;
         }
@@ -94,11 +99,14 @@ export function useAuth() {
       }
 
       const data = await res.json();
+      // Check if user needs to set up 2FA (no method set yet)
+      const needs2FA = !data.twoFactorMethod;
       setState({
-        user: data.user,
+        user: data,
         isLoading: false,
         isAuthenticated: true,
         require2FA: false,
+        needs2FASetup: needs2FA,
       });
     } catch (error) {
       console.error("Auth fetch error:", error);
@@ -108,6 +116,7 @@ export function useAuth() {
         isLoading: false,
         isAuthenticated: false,
         require2FA: false,
+        needs2FASetup: false,
       });
     }
   }, []);
@@ -141,15 +150,19 @@ export function useAuth() {
           user: data.user || null,
           isAuthenticated: true,
           require2FA: true,
+          needs2FASetup: false,
         }));
         return { success: true, require2FA: true };
       }
 
+      // Check if user needs to set up 2FA after login
+      const needs2FA = !data.user?.twoFactorMethod;
       setState({
         user: data.user,
         isLoading: false,
         isAuthenticated: true,
         require2FA: false,
+        needs2FASetup: needs2FA,
       });
 
       return { success: true };
@@ -215,6 +228,7 @@ export function useAuth() {
         isLoading: false,
         isAuthenticated: false,
         require2FA: false,
+        needs2FASetup: false,
       });
     }
   }, []);
@@ -224,6 +238,7 @@ export function useAuth() {
     isLoading: state.isLoading,
     isAuthenticated: state.isAuthenticated,
     require2FA: state.require2FA,
+    needs2FASetup: state.needs2FASetup,
     login,
     logout,
     verify2FA,

@@ -15,6 +15,7 @@ import { CheckCircle2, Building, Key, ChevronDown, ChevronUp, ExternalLink, Info
 import ImportExportSettings from "./ImportExportSettings";
 import BusinessSettings from "./BusinessSettings";
 import UsersSettings from "./UsersSettings";
+import SecuritySettings from "./SecuritySettings";
 import { useDataMode } from "@/lib/dataContext";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useQueryClient } from "@tanstack/react-query";
@@ -629,6 +630,7 @@ export default function Settings() {
             {isAdmin && (
               <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
             )}
+            <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
           </TabsList>
 
           <TabsContent value="rules" className="mt-6 space-y-6">
@@ -1573,6 +1575,10 @@ export default function Settings() {
               <UsersSettings />
             </TabsContent>
           )}
+
+          <TabsContent value="security" className="mt-6">
+            <SecuritySettings />
+          </TabsContent>
         </Tabs>
       </div>
 

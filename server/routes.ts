@@ -109,7 +109,7 @@ export async function registerRoutes(
         firstName: data.firstName,
         lastName: data.lastName,
         role: "admin",
-        twoFactorMethod: "email",
+        twoFactorMethod: null, // User will choose 2FA method in next step
         isActive: true,
       });
 
@@ -296,6 +296,190 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // ===================
+  // 2FA SETUP & WEBAUTHN ROUTES
+  // ===================
+
+  // Store WebAuthn challenges in memory (in production, use Redis or database)
+  const webauthnChallenges = new Map<string, { challenge: string; expiresAt: Date }>();
+
+  // Setup 2FA method
+  app.post("/api/auth/2fa/setup", isAuthenticated, async (req, res) => {
+    try {
+      const schema = z.object({
+        method: z.enum(["email", "webauthn"]),
+      });
+
+      const data = schema.parse(req.body);
+
+      if (data.method === "email") {
+        await authService.update2FAMethod(req.user!.id, "email");
+        await authService.markSessionAs2FAVerified(req.session!.sessionToken);
+        res.json({ success: true });
+      } else {
+        return res.status(400).json({ error: "Use WebAuthn registration endpoints for passkey setup" });
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      console.error("Error setting up 2FA:", error);
+      res.status(500).json({ error: "Failed to setup 2FA" });
+    }
+  });
+
+  // Disable 2FA
+  app.delete("/api/auth/2fa", isAuthenticated, require2FA, async (req, res) => {
+    try {
+      await authService.update2FAMethod(req.user!.id, null);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disabling 2FA:", error);
+      res.status(500).json({ error: "Failed to disable 2FA" });
+    }
+  });
+
+  // Get WebAuthn registration options
+  app.get("/api/auth/webauthn/register/options", isAuthenticated, async (req, res) => {
+    try {
+      const options = await authService.generateWebAuthnRegistrationOptions(req.user!);
+      
+      webauthnChallenges.set(req.user!.id, {
+        challenge: options.challenge,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      });
+
+      res.json(options);
+    } catch (error) {
+      console.error("Error generating WebAuthn registration options:", error);
+      res.status(500).json({ error: "Failed to generate registration options" });
+    }
+  });
+
+  // Verify WebAuthn registration
+  app.post("/api/auth/webauthn/register", isAuthenticated, async (req, res) => {
+    try {
+      const schema = z.object({
+        response: z.any(),
+        deviceName: z.string().optional(),
+      });
+
+      const data = schema.parse(req.body);
+
+      const challengeData = webauthnChallenges.get(req.user!.id);
+      if (!challengeData || challengeData.expiresAt < new Date()) {
+        return res.status(400).json({ error: "Challenge expired or not found" });
+      }
+
+      const verification = await authService.verifyWebAuthnRegistration(
+        req.user!,
+        data.response,
+        challengeData.challenge,
+        data.deviceName
+      );
+
+      webauthnChallenges.delete(req.user!.id);
+
+      if (verification.verified) {
+        await authService.markSessionAs2FAVerified(req.session!.sessionToken);
+        res.json({ success: true, verified: true });
+      } else {
+        res.status(400).json({ error: "Verification failed" });
+      }
+    } catch (error) {
+      console.error("Error verifying WebAuthn registration:", error);
+      res.status(500).json({ error: "Failed to verify registration", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Get passkey credentials
+  app.get("/api/auth/webauthn/credentials", isAuthenticated, require2FA, async (req, res) => {
+    try {
+      const credentials = await authService.getPasskeyCredentials(req.user!.id);
+      res.json(credentials.map(c => ({
+        id: c.id,
+        deviceName: c.deviceName,
+        deviceType: c.deviceType,
+        createdAt: c.createdAt,
+      })));
+    } catch (error) {
+      console.error("Error fetching credentials:", error);
+      res.status(500).json({ error: "Failed to fetch credentials" });
+    }
+  });
+
+  // Delete passkey credential
+  app.delete("/api/auth/webauthn/credentials/:id", isAuthenticated, require2FA, async (req, res) => {
+    try {
+      await authService.deletePasskeyCredential(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting credential:", error);
+      res.status(500).json({ error: "Failed to delete credential" });
+    }
+  });
+
+  // Get WebAuthn authentication options (for 2FA verification - user already authenticated)
+  app.post("/api/auth/webauthn/authenticate/options", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+
+      if (user.twoFactorMethod !== 'webauthn') {
+        return res.status(400).json({ error: "WebAuthn 2FA is not enabled for this user" });
+      }
+
+      const options = await authService.generateWebAuthnAuthenticationOptions(user);
+      
+      // Store challenge with session-specific key to prevent replay attacks
+      const sessionKey = `auth_${user.id}_${req.session!.sessionToken}`;
+      webauthnChallenges.set(sessionKey, {
+        challenge: options.challenge,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      });
+
+      res.json(options);
+    } catch (error) {
+      console.error("Error generating WebAuthn auth options:", error);
+      res.status(500).json({ error: "Failed to generate authentication options" });
+    }
+  });
+
+  // Verify WebAuthn authentication (for 2FA verification)
+  app.post("/api/auth/webauthn/authenticate", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const sessionKey = `auth_${user.id}_${req.session!.sessionToken}`;
+      
+      const challengeData = webauthnChallenges.get(sessionKey);
+      if (!challengeData) {
+        return res.status(400).json({ error: "No authentication challenge found. Please try again." });
+      }
+      
+      if (challengeData.expiresAt < new Date()) {
+        webauthnChallenges.delete(sessionKey);
+        return res.status(400).json({ error: "Challenge expired. Please try again." });
+      }
+
+      const { verification, userId } = await authService.verifyWebAuthnAuthentication(
+        req.body,
+        challengeData.challenge
+      );
+
+      // Always delete the challenge after use to prevent replay attacks
+      webauthnChallenges.delete(sessionKey);
+
+      if (verification.verified && userId === user.id) {
+        await authService.markSessionAs2FAVerified(req.session!.sessionToken);
+        res.json({ success: true, verified: true });
+      } else {
+        res.status(400).json({ error: "Verification failed. Please try again." });
+      }
+    } catch (error) {
+      console.error("Error verifying WebAuthn authentication:", error);
+      res.status(500).json({ error: "Authentication failed", message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
