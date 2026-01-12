@@ -10,7 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Building, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, Play, ListFilter, Pencil, Check, Upload, FileSpreadsheet, Trash2, Tag, X } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { CheckCircle2, Building, Key, ChevronDown, ChevronUp, ExternalLink, Info, Plus, Play, ListFilter, Pencil, Check, Upload, FileSpreadsheet, Trash2, Tag, X, Building2, ArrowLeftRight } from "lucide-react";
+import ImportExportSettings from "./ImportExportSettings";
+import BusinessSettings from "./BusinessSettings";
+import UsersSettings from "./UsersSettings";
 import { useDataMode } from "@/lib/dataContext";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,10 +41,13 @@ interface Category {
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { useMockData, setUseMockData } = useDataMode();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
   const [, params] = useRoute("/settings/:sectionId");
+  
+  const isAdmin = user?.role === "admin";
   
   // Redirect /settings to /settings/rules
   if (location === "/settings") {
@@ -615,8 +622,13 @@ export default function Settings() {
           <TabsList data-testid="tabs-settings">
             <TabsTrigger value="rules" data-testid="tab-rules">Rules</TabsTrigger>
             <TabsTrigger value="categories" data-testid="tab-categories">Categories</TabsTrigger>
+            <TabsTrigger value="business" data-testid="tab-business">Business</TabsTrigger>
             <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
+            <TabsTrigger value="import-export" data-testid="tab-import-export">Import/Export</TabsTrigger>
             <TabsTrigger value="preferences" data-testid="tab-preferences">Preferences</TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="rules" className="mt-6 space-y-6">
@@ -1199,6 +1211,10 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="business" className="mt-6 space-y-6">
+            <BusinessSettings />
+          </TabsContent>
+
           <TabsContent value="integrations" className="mt-6 space-y-6">
             <Card>
               <CardHeader>
@@ -1479,6 +1495,10 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="import-export" className="mt-6">
+            <ImportExportSettings />
+          </TabsContent>
+
           <TabsContent value="preferences" className="mt-6 space-y-6">
             <Card>
               <CardHeader>
@@ -1547,6 +1567,12 @@ export default function Settings() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="users" className="mt-6">
+              <UsersSettings />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

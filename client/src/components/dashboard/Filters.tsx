@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { DateFilter, FilterState } from "@/lib/types";
+import { useDateRange } from "@/lib/dateRangeContext";
 import { Search, Download, RefreshCw, CalendarIcon, X, AlertCircle, MoreHorizontal } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -39,6 +40,15 @@ interface FiltersProps {
 }
 
 export function Filters({ filterState, onFilterChange, onRefresh, onExport, availableCategories, isSyncing = false, unreviewedCount = 0 }: FiltersProps) {
+  const { 
+    dateRange, 
+    setDateRange, 
+    customStartDate, 
+    setCustomStartDate, 
+    customEndDate, 
+    setCustomEndDate 
+  } = useDateRange();
+
   const { data: taxYears = [] } = useQuery<string[]>({
     queryKey: ["/api/tax-years"],
     queryFn: async () => {
@@ -48,7 +58,22 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
     },
   });
 
-  const hasActiveFilters = filterState.search || filterState.type || filterState.category || filterState.dateRange !== 'this-month';
+  const handleDateRangeChange = (value: DateFilter) => {
+    setDateRange(value);
+    onFilterChange({ dateRange: value });
+  };
+
+  const handleCustomStartDateChange = (date: Date | undefined) => {
+    setCustomStartDate(date);
+    onFilterChange({ customStartDate: date });
+  };
+
+  const handleCustomEndDateChange = (date: Date | undefined) => {
+    setCustomEndDate(date);
+    onFilterChange({ customEndDate: date });
+  };
+
+  const hasActiveFilters = filterState.search || filterState.type || filterState.category || dateRange !== 'this-month';
 
   return (
     <div className="mb-6 space-y-3">
@@ -66,7 +91,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
         </div>
         
         <div className="flex items-center gap-2 shrink-0">
-          {filterState.dateRange === 'custom' && (
+          {dateRange === 'custom' && (
             <>
               <Popover>
                 <PopoverTrigger asChild>
@@ -75,18 +100,18 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                     size="sm"
                     className={cn(
                       "w-[100px] h-9 justify-start text-left font-normal text-sm",
-                      !filterState.customStartDate && "text-muted-foreground"
+                      !customStartDate && "text-muted-foreground"
                     )}
                   >
-                    {filterState.customStartDate ? format(filterState.customStartDate, "dd/MM/yy") : "Start"}
+                    {customStartDate ? format(customStartDate, "dd/MM/yy") : "Start"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={filterState.customStartDate}
-                    onSelect={(date) => onFilterChange({ customStartDate: date })}
-                    defaultMonth={filterState.customStartDate}
+                    selected={customStartDate}
+                    onSelect={handleCustomStartDateChange}
+                    defaultMonth={customStartDate}
                     initialFocus
                   />
                 </PopoverContent>
@@ -99,18 +124,18 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
                     size="sm"
                     className={cn(
                       "w-[100px] h-9 justify-start text-left font-normal text-sm",
-                      !filterState.customEndDate && "text-muted-foreground"
+                      !customEndDate && "text-muted-foreground"
                     )}
                   >
-                    {filterState.customEndDate ? format(filterState.customEndDate, "dd/MM/yy") : "End"}
+                    {customEndDate ? format(customEndDate, "dd/MM/yy") : "End"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={filterState.customEndDate}
-                    onSelect={(date) => onFilterChange({ customEndDate: date })}
-                    defaultMonth={filterState.customEndDate}
+                    selected={customEndDate}
+                    onSelect={handleCustomEndDateChange}
+                    defaultMonth={customEndDate}
                     initialFocus
                   />
                 </PopoverContent>
@@ -119,8 +144,8 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
           )}
 
           <Select 
-            value={filterState.dateRange} 
-            onValueChange={(value) => onFilterChange({ dateRange: value as DateFilter })}
+            value={dateRange} 
+            onValueChange={handleDateRangeChange}
           >
             <SelectTrigger className="w-[160px] sm:w-[180px] h-9" data-testid="select-date-range">
               <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
@@ -255,14 +280,19 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => onFilterChange({ 
-                search: '', 
-                type: undefined, 
-                category: undefined, 
-                dateRange: 'this-month',
-                customStartDate: undefined,
-                customEndDate: undefined
-              })}
+              onClick={() => {
+                setDateRange('this-month');
+                setCustomStartDate(undefined);
+                setCustomEndDate(undefined);
+                onFilterChange({ 
+                  search: '', 
+                  type: undefined, 
+                  category: undefined, 
+                  dateRange: 'this-month',
+                  customStartDate: undefined,
+                  customEndDate: undefined
+                });
+              }}
               className="h-8 text-muted-foreground hover:text-foreground px-2"
               data-testid="button-clear-filters"
             >

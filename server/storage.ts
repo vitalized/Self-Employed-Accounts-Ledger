@@ -1,11 +1,11 @@
-import { users, transactions, settings, categorizationRules, transactionNotes, categories, excludedFingerprints, mileageTrips, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory, type InsertExcludedFingerprint, type ExcludedFingerprint, type MileageTrip, type InsertMileageTrip } from "@shared/schema";
+import { users, transactions, settings, categorizationRules, transactionNotes, categories, excludedFingerprints, mileageTrips, business, type User, type InsertUser, type Transaction, type InsertTransaction, type UpdateTransaction, type Settings, type InsertSettings, type CategorizationRule, type InsertCategorizationRule, type TransactionNote, type InsertTransactionNote, type Category, type InsertCategory, type InsertExcludedFingerprint, type ExcludedFingerprint, type MileageTrip, type InsertMileageTrip, type Business, type InsertBusiness } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, ilike, between, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   // Transaction methods
@@ -37,9 +37,14 @@ export interface IStorage {
   
   // Transaction notes methods
   getNotes(): Promise<TransactionNote[]>;
+  getNoteById(id: string): Promise<TransactionNote | undefined>;
   getNoteByDescription(description: string): Promise<TransactionNote | undefined>;
+  getNoteByTransactionId(transactionId: string): Promise<TransactionNote | undefined>;
   setNote(description: string, note: string): Promise<TransactionNote>;
+  setNoteForTransaction(transactionId: string, note: string): Promise<TransactionNote>;
   deleteNote(description: string): Promise<boolean>;
+  deleteNoteById(id: string): Promise<boolean>;
+  deleteNoteForTransaction(transactionId: string): Promise<boolean>;
   
   // Category methods
   getCategories(): Promise<Category[]>;
@@ -65,6 +70,10 @@ export interface IStorage {
   deleteMileageTrip(id: string): Promise<boolean>;
   deleteMileageTripByTransactionId(transactionId: string): Promise<boolean>;
   getMileageTotalForTaxYear(taxYearStart: Date, taxYearEnd: Date): Promise<number>;
+  
+  // Business methods
+  getBusiness(): Promise<Business | undefined>;
+  updateBusiness(data: Partial<InsertBusiness>): Promise<Business>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -74,8 +83,8 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user || undefined;
   }
 
@@ -345,10 +354,24 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(transactionNotes);
   }
 
+  async getNoteById(id: string): Promise<TransactionNote | undefined> {
+    const [note] = await db.select()
+      .from(transactionNotes)
+      .where(eq(transactionNotes.id, id));
+    return note || undefined;
+  }
+
   async getNoteByDescription(description: string): Promise<TransactionNote | undefined> {
     const [note] = await db.select()
       .from(transactionNotes)
       .where(eq(transactionNotes.description, description));
+    return note || undefined;
+  }
+
+  async getNoteByTransactionId(transactionId: string): Promise<TransactionNote | undefined> {
+    const [note] = await db.select()
+      .from(transactionNotes)
+      .where(eq(transactionNotes.transactionId, transactionId));
     return note || undefined;
   }
 
@@ -369,10 +392,43 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async setNoteForTransaction(transactionId: string, note: string): Promise<TransactionNote> {
+    const existing = await this.getNoteByTransactionId(transactionId);
+    if (existing) {
+      const [updated] = await db
+        .update(transactionNotes)
+        .set({ note, updatedAt: new Date() })
+        .where(eq(transactionNotes.transactionId, transactionId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(transactionNotes)
+      .values({ transactionId, note })
+      .returning();
+    return created;
+  }
+
   async deleteNote(description: string): Promise<boolean> {
     const result = await db
       .delete(transactionNotes)
       .where(eq(transactionNotes.description, description))
+      .returning();
+    return result.length > 0;
+  }
+
+  async deleteNoteById(id: string): Promise<boolean> {
+    const result = await db
+      .delete(transactionNotes)
+      .where(eq(transactionNotes.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async deleteNoteForTransaction(transactionId: string): Promise<boolean> {
+    const result = await db
+      .delete(transactionNotes)
+      .where(eq(transactionNotes.transactionId, transactionId))
       .returning();
     return result.length > 0;
   }
@@ -556,6 +612,33 @@ export class DatabaseStorage implements IStorage {
       .from(mileageTrips)
       .where(between(mileageTrips.date, taxYearStart, taxYearEnd));
     return parseFloat(result[0]?.total || '0');
+  }
+
+  async getBusiness(): Promise<Business | undefined> {
+    const [biz] = await db.select().from(business);
+    return biz || undefined;
+  }
+
+  async updateBusiness(data: Partial<InsertBusiness>): Promise<Business> {
+    const existing = await this.getBusiness();
+    
+    if (existing) {
+      const [updated] = await db
+        .update(business)
+        .set(data)
+        .where(eq(business.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      if (!data.name) {
+        throw new Error("Business name is required for new business");
+      }
+      const [created] = await db
+        .insert(business)
+        .values(data as InsertBusiness)
+        .returning();
+      return created;
+    }
   }
 }
 

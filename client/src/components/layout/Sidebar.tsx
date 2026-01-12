@@ -25,11 +25,16 @@ import {
   Home,
   Clock,
   PiggyBank,
-  Tags
+  Tags,
+  Wrench,
+  Users,
+  FileDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useAuthContext } from "@/lib/authContext";
+import { queryClient } from "@/lib/queryClient";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -40,6 +45,10 @@ const reportSubItems = [
   { href: "/reports/sa103f", label: "SA103F Summary", icon: FileText },
   { href: "/reports/profit-loss", label: "Profit & Loss", icon: TrendingUp },
   { href: "/reports/expenses", label: "Expense Breakdown", icon: Wallet },
+  { href: "/reports/customer-profitability", label: "Customer Profitability", icon: Users },
+];
+
+const toolsSubItems = [
   { href: "/reports/tax-calculator", label: "Tax Calculator", icon: Calculator },
   { href: "/reports/vat", label: "VAT Threshold Tracker", icon: ReceiptText },
   { href: "/reports/mileage", label: "Mileage Report", icon: Car },
@@ -50,26 +59,43 @@ const reportSubItems = [
 ];
 
 const settingsSubItems = [
+  { href: "/settings/users", label: "Users", icon: Users },
+  { href: "/settings/business", label: "Business", icon: Building },
   { href: "/settings/categories", label: "Categories", icon: Tags },
   { href: "/settings/rules", label: "Rules", icon: ListFilter },
   { href: "/settings/integrations", label: "Integrations", icon: Building },
+  { href: "/settings/import-export", label: "Import/Export", icon: FileDown },
   { href: "/settings/preferences", label: "Preferences", icon: Sliders },
 ];
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
+  const { logout } = useAuthContext();
   const [mounted, setMounted] = useState(false);
-  const [reportsExpanded, setReportsExpanded] = useState(() => location.startsWith('/reports'));
+  const [reportsExpanded, setReportsExpanded] = useState(() => 
+    reportSubItems.some(item => location === item.href)
+  );
+  const [toolsExpanded, setToolsExpanded] = useState(() => 
+    toolsSubItems.some(item => location === item.href)
+  );
   const [settingsExpanded, setSettingsExpanded] = useState(() => location.startsWith('/settings'));
+
+  const handleLogout = async () => {
+    queryClient.clear();
+    await logout();
+  };
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (location.startsWith('/reports')) {
+    if (reportSubItems.some(item => location === item.href)) {
       setReportsExpanded(true);
+    }
+    if (toolsSubItems.some(item => location === item.href)) {
+      setToolsExpanded(true);
     }
     if (location.startsWith('/settings')) {
       setSettingsExpanded(true);
@@ -85,7 +111,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/transactions", label: "Transactions", icon: Receipt },
   ];
 
-  const isReportsActive = location.startsWith('/reports');
+  const isReportsActive = reportSubItems.some(item => location === item.href);
+  const isToolsActive = toolsSubItems.some(item => location === item.href);
   const isSettingsActive = location.startsWith('/settings');
 
   return (
@@ -177,9 +204,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 )}
                 data-testid="nav-reports-toggle"
               >
-                <div className="flex items-center">
-                  <PieChart className="h-5 w-5 mr-3" />
-                  Reports
+                <div className="flex flex-col">
+                  <div className="flex items-center">
+                    <PieChart className="h-5 w-5 mr-3" />
+                    Reports
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-8">Financial statements</span>
                 </div>
                 {reportsExpanded ? (
                   <ChevronDown className="h-4 w-4" />
@@ -191,6 +221,73 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               {reportsExpanded && (
                 <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
                   {reportSubItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center rounded-md py-1.5 px-2 text-sm transition-colors",
+                          isActive 
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium" 
+                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                        data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <Icon className="h-4 w-4 mr-2" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {collapsed ? (
+            <Link 
+              href="/reports/tax-calculator"
+              className={cn(
+                "flex items-center rounded-md py-2 text-sm font-medium transition-colors justify-center px-2",
+                isToolsActive 
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              )}
+              data-testid="nav-tools"
+              title="Tools"
+            >
+              <Wrench className="h-5 w-5" />
+            </Link>
+          ) : (
+            <div>
+              <button
+                onClick={() => setToolsExpanded(!toolsExpanded)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-md py-2 px-3 text-sm font-medium transition-colors",
+                  isToolsActive 
+                    ? "bg-sidebar-primary/50 text-sidebar-primary-foreground" 
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+                data-testid="nav-tools-toggle"
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-center">
+                    <Wrench className="h-5 w-5 mr-3" />
+                    Tools
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-8">Calculators & trackers</span>
+                </div>
+                {toolsExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+              
+              {toolsExpanded && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                  {toolsSubItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = location === item.href;
                     return (
@@ -241,9 +338,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 )}
                 data-testid="nav-settings-toggle"
               >
-                <div className="flex items-center">
-                  <Settings className="h-5 w-5 mr-3" />
-                  Settings
+                <div className="flex flex-col">
+                  <div className="flex items-center">
+                    <Settings className="h-5 w-5 mr-3" />
+                    Settings
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-8">Configuration</span>
                 </div>
                 {settingsExpanded ? (
                   <ChevronDown className="h-4 w-4" />
@@ -299,10 +399,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {!collapsed && (mounted && theme === "dark" ? "Light Mode" : "Dark Mode")}
         </button>
         <button 
+          onClick={handleLogout}
           className={cn(
             "flex w-full items-center rounded-md py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
             collapsed ? "justify-center px-2" : "px-3"
           )}
+          data-testid="button-sign-out"
           title={collapsed ? "Sign Out" : undefined}
         >
           <LogOut className={cn("h-5 w-5", !collapsed && "mr-3")} />

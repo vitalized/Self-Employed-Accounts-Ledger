@@ -1,20 +1,29 @@
 import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Transaction } from "@/lib/types";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts';
 import { parseISO, format } from "date-fns";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ProfitLossReportProps {
   transactions: Transaction[];
   yearLabel: string;
 }
 
+interface ClientIncomeData {
+  clientName: string;
+  total: number;
+  transactions: Transaction[];
+}
+
 export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportProps) {
-  const { financials, monthlyData, expenseData } = useMemo(() => {
+  const { financials, monthlyData, expenseData, clientIncomeData } = useMemo(() => {
     let income = 0;
     let expenses = 0;
     const expenseCategories: Record<string, number> = {};
     const months: Record<string, { name: string, income: number, expenses: number, profit: number }> = {};
+    const clientIncome: Record<string, { total: number; transactions: Transaction[] }> = {};
 
     transactions.forEach(t => {
       if (t.type === 'Business') {
@@ -29,6 +38,13 @@ export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportPr
           income += amount;
           months[key].income += amount;
           months[key].profit += amount;
+
+          const clientName = t.merchant && t.merchant.trim() !== '' ? t.merchant : 'Miscellaneous';
+          if (!clientIncome[clientName]) {
+            clientIncome[clientName] = { total: 0, transactions: [] };
+          }
+          clientIncome[clientName].total += amount;
+          clientIncome[clientName].transactions.push(t);
         } else if (t.businessType === 'Expense') {
           expenses += Math.abs(amount);
           months[key].expenses += Math.abs(amount);
@@ -41,12 +57,21 @@ export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportPr
       }
     });
 
+    const clientIncomeData: ClientIncomeData[] = Object.entries(clientIncome)
+      .map(([clientName, data]) => ({
+        clientName,
+        total: data.total,
+        transactions: data.transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      }))
+      .sort((a, b) => b.total - a.total);
+
     return {
       financials: { income, expenses, netProfit: income - expenses },
       monthlyData: Object.keys(months).sort().map(k => months[k]),
       expenseData: Object.entries(expenseCategories)
         .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
+        .sort((a, b) => b.value - a.value),
+      clientIncomeData
     };
   }, [transactions]);
 
@@ -153,9 +178,54 @@ export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportPr
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                <div className="font-semibold">Revenue</div>
-                <div className="text-right font-semibold">£{financials.income.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+              <div className="space-y-2">
+                <div className="font-semibold text-lg">Revenue by Client</div>
+                {clientIncomeData.length > 0 ? (
+                  <Accordion type="multiple" className="w-full">
+                    {clientIncomeData.map((client, index) => (
+                      <AccordionItem key={client.clientName} value={`client-${index}`}>
+                        <AccordionTrigger className="hover:no-underline">
+                          <div className="flex justify-between w-full pr-4">
+                            <span className="font-medium">{client.clientName}</span>
+                            <span className="text-green-600 font-semibold">
+                              £{client.total.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {client.transactions.map((t) => (
+                                <TableRow key={t.id}>
+                                  <TableCell className="text-muted-foreground">
+                                    {format(parseISO(t.date), 'dd MMM yyyy')}
+                                  </TableCell>
+                                  <TableCell>{t.description}</TableCell>
+                                  <TableCell className="text-right text-green-600">
+                                    £{Number(t.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                ) : (
+                  <div className="text-muted-foreground pl-4 text-sm">No income transactions</div>
+                )}
+                <div className="grid grid-cols-2 gap-4 border-t pt-2 font-medium">
+                  <div>Total Revenue</div>
+                  <div className="text-right text-green-600">£{financials.income.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div>
+                </div>
               </div>
               
               <div className="space-y-2">

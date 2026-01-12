@@ -1,9 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateTransactionSchema, insertCategorizationRuleSchema, insertCategorySchema } from "@shared/schema";
+import { db } from "./db";
+import { insertTransactionSchema, updateTransactionSchema, insertCategorizationRuleSchema, insertCategorySchema, insertBusinessSchema, users, passwordCredentials, authSessions, emailVerificationCodes } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
+import { authService, isAuthenticated, require2FA, requireRole } from "./auth";
 
 const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
 const STARLING_SANDBOX_API_BASE = "https://api-sandbox.starlingbank.com/api/v2";
@@ -69,6 +72,395 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // ===================
+  // AUTH ROUTES
+  // ===================
+
+  // Check if initial setup is needed (no admin exists)
+  app.get("/api/auth/needs-setup", async (req, res) => {
+    try {
+      const adminExists = await authService.checkIfAdminExists();
+      res.json({ needsSetup: !adminExists });
+    } catch (error) {
+      console.error("Error checking setup status:", error);
+      res.status(500).json({ error: "Failed to check setup status" });
+    }
+  });
+
+  // Initial setup - creates first admin account
+  app.post("/api/auth/initial-setup", async (req, res) => {
+    try {
+      const adminExists = await authService.checkIfAdminExists();
+      if (adminExists) {
+        return res.status(400).json({ error: "Setup already complete", message: "An admin account already exists" });
+      }
+
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+      });
+
+      const data = schema.parse(req.body);
+
+      const user = await authService.createUser({
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: "admin",
+        twoFactorMethod: "email",
+        isActive: true,
+      });
+
+      await authService.createPasswordCredential(user.id, data.password);
+
+      const session = await authService.createSession(
+        user.id,
+        req.ip,
+        req.headers["user-agent"]
+      );
+
+      await authService.updateLastLogin(user.id);
+
+      res.status(201).json({
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+        sessionToken: session.sessionToken,
+        requires2FA: !!user.twoFactorMethod,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      console.error("Error during initial setup:", error);
+      res.status(500).json({ error: "Failed to complete setup" });
+    }
+  });
+
+  // Login with email/password
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string(),
+      });
+
+      const data = schema.parse(req.body);
+
+      const user = await authService.getUserByEmail(data.email);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ error: "Account disabled" });
+      }
+
+      const credential = await authService.getPasswordCredential(user.id);
+      if (!credential) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const isValid = await authService.verifyPassword(data.password, credential.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const session = await authService.createSession(
+        user.id,
+        req.ip,
+        req.headers["user-agent"]
+      );
+
+      await authService.updateLastLogin(user.id);
+
+      if (user.twoFactorMethod === "email") {
+        await authService.generateVerificationCode(user.id, "two_factor");
+        return res.json({
+          sessionToken: session.sessionToken,
+          requires2FA: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+          },
+        });
+      }
+
+      res.json({
+        sessionToken: session.sessionToken,
+        requires2FA: false,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      console.error("Error during login:", error);
+      res.status(500).json({ error: "Failed to login" });
+    }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", isAuthenticated, async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const sessionToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+      if (sessionToken) {
+        await authService.invalidateSession(sessionToken);
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error during logout:", error);
+      res.status(500).json({ error: "Failed to logout" });
+    }
+  });
+
+  // Verify 2FA code
+  app.post("/api/auth/2fa/verify", isAuthenticated, async (req, res) => {
+    try {
+      const schema = z.object({
+        code: z.string().length(6),
+      });
+
+      const data = schema.parse(req.body);
+
+      const isValid = await authService.verifyCode(req.user!.id, data.code);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid or expired code" });
+      }
+
+      const authHeader = req.headers.authorization;
+      const sessionToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+      if (sessionToken) {
+        await authService.markSessionAs2FAVerified(sessionToken);
+      }
+
+      res.json({ success: true, verified: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      console.error("Error verifying 2FA code:", error);
+      res.status(500).json({ error: "Failed to verify code" });
+    }
+  });
+
+  // Resend 2FA code
+  app.post("/api/auth/2fa/resend", isAuthenticated, async (req, res) => {
+    try {
+      if (!req.user!.twoFactorMethod) {
+        return res.status(400).json({ error: "2FA not enabled for this user" });
+      }
+
+      await authService.generateVerificationCode(req.user!.id, "two_factor");
+
+      res.json({ success: true, message: "Verification code sent" });
+    } catch (error) {
+      console.error("Error resending 2FA code:", error);
+      res.status(500).json({ error: "Failed to resend code" });
+    }
+  });
+
+  // Get current authenticated user
+  app.get("/api/auth/me", isAuthenticated, require2FA, async (req, res) => {
+    try {
+      const user = req.user!;
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        profileImageUrl: user.profileImageUrl,
+        twoFactorMethod: user.twoFactorMethod,
+        lastLoginAt: user.lastLoginAt,
+      });
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // ===================
+  // END AUTH ROUTES
+  // ===================
+
+  // ===================
+  // USER MANAGEMENT ROUTES (Admin only)
+  // ===================
+
+  // List all users
+  app.get("/api/users", isAuthenticated, require2FA, requireRole("admin"), async (req, res) => {
+    try {
+      const allUsers = await db.select().from(users).orderBy(users.createdAt);
+      res.json(allUsers.map(u => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role,
+        isActive: u.isActive,
+        lastLoginAt: u.lastLoginAt,
+        createdAt: u.createdAt,
+      })));
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Create new user
+  app.post("/api/users", isAuthenticated, require2FA, requireRole("admin"), async (req, res) => {
+    try {
+      const schema = z.object({
+        email: z.string().email(),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        role: z.enum(["admin", "accountant"]).default("accountant"),
+      });
+
+      const data = schema.parse(req.body);
+
+      const existingUser = await authService.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "User with this email already exists" });
+      }
+
+      const temporaryPassword = crypto.randomBytes(8).toString("hex");
+
+      const user = await authService.createUser({
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role,
+        twoFactorMethod: "email",
+        isActive: true,
+      });
+
+      const passwordHash = await authService.hashPassword(temporaryPassword);
+      await db.insert(passwordCredentials).values({
+        userId: user.id,
+        passwordHash,
+        mustChangePassword: true,
+      });
+
+      console.log(`[ADMIN] Created user ${user.email} with temporary password: ${temporaryPassword}`);
+
+      res.status(201).json({
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          isActive: user.isActive,
+          lastLoginAt: user.lastLoginAt,
+          createdAt: user.createdAt,
+        },
+        temporaryPassword,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  // Update user (role, isActive)
+  app.patch("/api/users/:id", isAuthenticated, require2FA, requireRole("admin"), async (req, res) => {
+    try {
+      const userId = req.params.id;
+      
+      const schema = z.object({
+        role: z.enum(["admin", "accountant"]).optional(),
+        isActive: z.boolean().optional(),
+      });
+
+      const data = schema.parse(req.body);
+
+      if (Object.keys(data).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+
+      const [updatedUser] = await db
+        .update(users)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        role: updatedUser.role,
+        isActive: updatedUser.isActive,
+        lastLoginAt: updatedUser.lastLoginAt,
+        createdAt: updatedUser.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Delete user
+  app.delete("/api/users/:id", isAuthenticated, require2FA, requireRole("admin"), async (req, res) => {
+    try {
+      const userId = req.params.id;
+
+      if (userId === req.user!.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      await db.delete(passwordCredentials).where(eq(passwordCredentials.userId, userId));
+      await db.delete(authSessions).where(eq(authSessions.userId, userId));
+      await db.delete(emailVerificationCodes).where(eq(emailVerificationCodes.userId, userId));
+      
+      const [deletedUser] = await db.delete(users).where(eq(users.id, userId)).returning();
+
+      if (!deletedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ success: true, message: "User deleted" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // ===================
+  // END USER MANAGEMENT ROUTES
+  // ===================
+
   // Get available tax years based on transaction dates
   app.get("/api/tax-years", async (req, res) => {
     try {
@@ -358,7 +750,7 @@ export async function registerRoutes(
 
   // ===== Transaction Notes API endpoints =====
 
-  // Get all notes
+  // Get all notes (both description-based and transaction-specific)
   app.get("/api/notes", async (req, res) => {
     try {
       const notes = await storage.getNotes();
@@ -369,7 +761,47 @@ export async function registerRoutes(
     }
   });
 
-  // Set note for a description
+  // Get note for a specific transaction
+  app.get("/api/notes/transaction/:transactionId", async (req, res) => {
+    try {
+      const note = await storage.getNoteByTransactionId(req.params.transactionId);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error fetching note:", error);
+      res.status(500).json({ error: "Failed to fetch note" });
+    }
+  });
+
+  // Create or update note - supports both description-based and transaction-specific notes
+  app.post("/api/notes", async (req, res) => {
+    try {
+      const { description, transactionId, note } = req.body;
+      
+      if (!note || typeof note !== 'string') {
+        return res.status(400).json({ error: "Note text is required" });
+      }
+      
+      if (transactionId && typeof transactionId === 'string') {
+        // Transaction-specific note
+        const savedNote = await storage.setNoteForTransaction(transactionId, note);
+        return res.status(201).json(savedNote);
+      } else if (description && typeof description === 'string') {
+        // Description-based note (applies to all matching transactions)
+        const savedNote = await storage.setNote(description, note);
+        return res.status(201).json(savedNote);
+      } else {
+        return res.status(400).json({ error: "Either description or transactionId is required" });
+      }
+    } catch (error) {
+      console.error("Error saving note:", error);
+      res.status(500).json({ error: "Failed to save note" });
+    }
+  });
+
+  // Set note for a description (legacy PUT endpoint for backward compatibility)
   app.put("/api/notes", async (req, res) => {
     try {
       const { description, note } = req.body;
@@ -386,6 +818,20 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error saving note:", error);
       res.status(500).json({ error: "Failed to save note" });
+    }
+  });
+
+  // Delete note by ID
+  app.delete("/api/notes/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteNoteById(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      res.status(500).json({ error: "Failed to delete note" });
     }
   });
 
@@ -1369,6 +1815,390 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting mileage trip:", error);
       res.status(500).json({ error: "Failed to delete mileage trip" });
+    }
+  });
+
+  // Get business details
+  app.get("/api/business", async (req, res) => {
+    try {
+      const biz = await storage.getBusiness();
+      res.json(biz || null);
+    } catch (error) {
+      console.error("Error fetching business:", error);
+      res.status(500).json({ error: "Failed to fetch business details" });
+    }
+  });
+
+  // Create/update business details (upsert)
+  app.post("/api/business", async (req, res) => {
+    try {
+      const data = req.body;
+      
+      // Convert startDate string to Date if provided
+      if (data.startDate) {
+        data.startDate = new Date(data.startDate);
+      }
+      
+      // Validate periodStartMonth (1-12)
+      if (data.periodStartMonth !== undefined && data.periodStartMonth !== null) {
+        const month = parseInt(data.periodStartMonth);
+        if (isNaN(month) || month < 1 || month > 12) {
+          return res.status(400).json({ error: "Period start month must be between 1 and 12" });
+        }
+        data.periodStartMonth = month;
+      }
+      
+      // Validate periodStartDay (1-31)
+      if (data.periodStartDay !== undefined && data.periodStartDay !== null) {
+        const day = parseInt(data.periodStartDay);
+        if (isNaN(day) || day < 1 || day > 31) {
+          return res.status(400).json({ error: "Period start day must be between 1 and 31" });
+        }
+        data.periodStartDay = day;
+      }
+      
+      // Validate UTR format (10 digits)
+      if (data.utr && !/^\d{10}$/.test(data.utr)) {
+        return res.status(400).json({ error: "UTR must be exactly 10 digits" });
+      }
+      
+      const biz = await storage.updateBusiness(data);
+      res.json(biz);
+    } catch (error) {
+      console.error("Error updating business:", error);
+      res.status(500).json({ error: "Failed to update business details" });
+    }
+  });
+
+  // === EXPORT/IMPORT ROUTES ===
+
+  // Export transactions as CSV
+  app.get("/api/export/transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions();
+      
+      const headers = ["date", "description", "reference", "amount", "merchant", "type", "category", "businessType", "status", "tags"];
+      const csvLines = [headers.join(",")];
+      
+      for (const tx of transactions) {
+        const row = [
+          new Date(tx.date).toISOString().split('T')[0],
+          `"${(tx.description || '').replace(/"/g, '""')}"`,
+          `"${(tx.reference || '').replace(/"/g, '""')}"`,
+          tx.amount,
+          `"${(tx.merchant || '').replace(/"/g, '""')}"`,
+          tx.type,
+          tx.category || '',
+          tx.businessType || '',
+          tx.status,
+          tx.tags ? tx.tags.join(';') : ''
+        ];
+        csvLines.push(row.join(","));
+      }
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="transactions.csv"');
+      res.send(csvLines.join('\n'));
+    } catch (error) {
+      console.error("Error exporting transactions:", error);
+      res.status(500).json({ error: "Failed to export transactions" });
+    }
+  });
+
+  // Export categorization rules as CSV
+  app.get("/api/export/rules", async (req, res) => {
+    try {
+      const rules = await storage.getRules();
+      
+      const headers = ["keyword", "type", "businessType", "category"];
+      const csvLines = [headers.join(",")];
+      
+      for (const rule of rules) {
+        const row = [
+          `"${(rule.keyword || '').replace(/"/g, '""')}"`,
+          rule.type,
+          rule.businessType || '',
+          `"${(rule.category || '').replace(/"/g, '""')}"`
+        ];
+        csvLines.push(row.join(","));
+      }
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="categorization-rules.csv"');
+      res.send(csvLines.join('\n'));
+    } catch (error) {
+      console.error("Error exporting rules:", error);
+      res.status(500).json({ error: "Failed to export rules" });
+    }
+  });
+
+  // Export categories as CSV
+  app.get("/api/export/categories", async (req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      
+      const headers = ["code", "label", "description", "type", "hmrcBox"];
+      const csvLines = [headers.join(",")];
+      
+      for (const cat of categories) {
+        const row = [
+          `"${(cat.code || '').replace(/"/g, '""')}"`,
+          `"${(cat.label || '').replace(/"/g, '""')}"`,
+          `"${(cat.description || '').replace(/"/g, '""')}"`,
+          cat.type,
+          cat.hmrcBox || ''
+        ];
+        csvLines.push(row.join(","));
+      }
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="categories.csv"');
+      res.send(csvLines.join('\n'));
+    } catch (error) {
+      console.error("Error exporting categories:", error);
+      res.status(500).json({ error: "Failed to export categories" });
+    }
+  });
+
+  // Helper function to parse CSV content
+  function parseCSV(csvContent: string): { headers: string[]; rows: Record<string, string>[] } {
+    const lines = csvContent.split('\n').map(line => line.trim()).filter(line => line);
+    if (lines.length === 0) {
+      return { headers: [], rows: [] };
+    }
+    
+    const parseRow = (line: string): string[] => {
+      const values: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim());
+      return values;
+    };
+    
+    const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, ''));
+    const rows: Record<string, string>[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseRow(lines[i]);
+      const row: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index] || '';
+      });
+      rows.push(row);
+    }
+    
+    return { headers, rows };
+  }
+
+  // Import transactions from CSV
+  app.post("/api/import/transactions", async (req, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ error: "No CSV content provided" });
+      }
+      
+      const { rows } = parseCSV(csvContent);
+      let imported = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      
+      for (const row of rows) {
+        try {
+          const date = new Date(row.date);
+          if (isNaN(date.getTime())) {
+            skipped++;
+            errors.push(`Invalid date: ${row.date}`);
+            continue;
+          }
+          
+          const amount = parseFloat(row.amount);
+          if (isNaN(amount)) {
+            skipped++;
+            errors.push(`Invalid amount: ${row.amount}`);
+            continue;
+          }
+          
+          const description = row.description || row.merchant || 'Unknown';
+          const fingerprint = createTransactionFingerprint(date, amount, description, row.reference || null);
+          
+          const existingFingerprints = await storage.getExistingFingerprints();
+          if (existingFingerprints.has(fingerprint)) {
+            skipped++;
+            continue;
+          }
+          
+          const tags = row.tags ? row.tags.split(';').filter(Boolean) : [];
+          tags.push('import:csv');
+          
+          await storage.createTransactionWithFingerprint({
+            date,
+            description,
+            reference: row.reference || null,
+            amount: amount.toString(),
+            merchant: row.merchant || description,
+            type: row.type || 'Unreviewed',
+            category: row.category || null,
+            businessType: row.businesstype || null,
+            status: row.status || 'Cleared',
+            tags,
+          }, fingerprint);
+          
+          imported++;
+        } catch (err) {
+          skipped++;
+          errors.push(`Error processing row: ${JSON.stringify(row).substring(0, 100)}`);
+        }
+      }
+      
+      res.json({
+        imported,
+        skipped,
+        total: rows.length,
+        errors: errors.slice(0, 10),
+        message: `Imported ${imported} transactions, skipped ${skipped}`
+      });
+    } catch (error) {
+      console.error("Error importing transactions:", error);
+      res.status(500).json({ error: "Failed to import transactions" });
+    }
+  });
+
+  // Import categorization rules from CSV
+  app.post("/api/import/rules", async (req, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ error: "No CSV content provided" });
+      }
+      
+      const { rows } = parseCSV(csvContent);
+      let imported = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      
+      const existingRules = await storage.getRules();
+      const existingKeywords = new Set(existingRules.map(r => r.keyword.toLowerCase()));
+      
+      for (const row of rows) {
+        try {
+          if (!row.keyword) {
+            skipped++;
+            errors.push('Missing keyword');
+            continue;
+          }
+          
+          if (existingKeywords.has(row.keyword.toLowerCase())) {
+            skipped++;
+            continue;
+          }
+          
+          const validTypes = ['Personal', 'Business'];
+          const type = validTypes.includes(row.type) ? row.type : 'Personal';
+          
+          await storage.createRule({
+            keyword: row.keyword,
+            type,
+            businessType: row.businesstype || null,
+            category: row.category || null,
+          });
+          
+          existingKeywords.add(row.keyword.toLowerCase());
+          imported++;
+        } catch (err) {
+          skipped++;
+          errors.push(`Error processing rule: ${row.keyword}`);
+        }
+      }
+      
+      res.json({
+        imported,
+        skipped,
+        total: rows.length,
+        errors: errors.slice(0, 10),
+        message: `Imported ${imported} rules, skipped ${skipped}`
+      });
+    } catch (error) {
+      console.error("Error importing rules:", error);
+      res.status(500).json({ error: "Failed to import rules" });
+    }
+  });
+
+  // Import categories from CSV
+  app.post("/api/import/categories", async (req, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ error: "No CSV content provided" });
+      }
+      
+      const { rows } = parseCSV(csvContent);
+      let imported = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      
+      const existingCategories = await storage.getCategories();
+      const existingCodes = new Set(existingCategories.map(c => c.code.toLowerCase()));
+      
+      for (const row of rows) {
+        try {
+          if (!row.code || !row.label) {
+            skipped++;
+            errors.push('Missing code or label');
+            continue;
+          }
+          
+          if (existingCodes.has(row.code.toLowerCase())) {
+            skipped++;
+            continue;
+          }
+          
+          const validTypes = ['Income', 'Expense'];
+          const type = validTypes.includes(row.type) ? row.type : 'Expense';
+          
+          await storage.createCategory({
+            code: row.code,
+            label: row.label,
+            description: row.description || null,
+            type,
+            hmrcBox: row.hmrcbox || null,
+          });
+          
+          existingCodes.add(row.code.toLowerCase());
+          imported++;
+        } catch (err) {
+          skipped++;
+          errors.push(`Error processing category: ${row.code}`);
+        }
+      }
+      
+      res.json({
+        imported,
+        skipped,
+        total: rows.length,
+        errors: errors.slice(0, 10),
+        message: `Imported ${imported} categories, skipped ${skipped}`
+      });
+    } catch (error) {
+      console.error("Error importing categories:", error);
+      res.status(500).json({ error: "Failed to import categories" });
     }
   });
 

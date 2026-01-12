@@ -3,12 +3,9 @@ import { pgTable, text, varchar, timestamp, decimal, integer } from "drizzle-orm
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export * from "./models/auth";
+
+import { users } from "./models/auth";
 
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -26,17 +23,6 @@ export const transactions = pgTable("transactions", {
   fingerprint: text("fingerprint").unique(), // For duplicate detection: date+amount+description+reference hash
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
-
-// User schemas
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export const selectUserSchema = createSelectSchema(users);
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
 
 // Transaction schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
@@ -88,10 +74,11 @@ export const insertCategorizationRuleSchema = createInsertSchema(categorizationR
 export type InsertCategorizationRule = z.infer<typeof insertCategorizationRuleSchema>;
 export type CategorizationRule = typeof categorizationRules.$inferSelect;
 
-// Transaction notes - keyed by description for shared notes across matching transactions
+// Transaction notes - keyed by description for shared notes or transactionId for specific notes
 export const transactionNotes = pgTable("transaction_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  description: text("description").notNull().unique(),
+  description: text("description"),
+  transactionId: varchar("transaction_id").references(() => transactions.id),
   note: text("note").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -161,3 +148,25 @@ export const insertMileageTripSchema = createInsertSchema(mileageTrips).omit({
 
 export type InsertMileageTrip = z.infer<typeof insertMileageTripSchema>;
 export type MileageTrip = typeof mileageTrips.$inferSelect;
+
+// Business details for sole trader
+export const business = pgTable("business", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  tradingName: text("trading_name"),
+  registeredAddress: text("registered_address"),
+  startDate: timestamp("start_date"),
+  periodStartMonth: integer("period_start_month"), // 1-12
+  periodStartDay: integer("period_start_day"), // 1-31
+  preferredBank: text("preferred_bank"),
+  utr: text("utr").unique(), // Unique Tax Reference
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertBusinessSchema = createInsertSchema(business).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBusiness = z.infer<typeof insertBusinessSchema>;
+export type Business = typeof business.$inferSelect;

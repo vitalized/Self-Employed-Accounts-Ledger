@@ -124,6 +124,7 @@ async function syncStarlingTransactions(): Promise<void> {
           userId: null,
           date: new Date(item.transactionTime),
           description: item.counterPartyName || item.reference || "Unknown",
+          reference: item.reference || null,
           amount: String(amount),
           merchant: item.counterPartyName || "Unknown",
           type: transactionType,
@@ -131,6 +132,7 @@ async function syncStarlingTransactions(): Promise<void> {
           businessType,
           status: "Cleared" as const,
           tags: [] as string[],
+          fingerprint: null,
           createdAt: new Date(),
         };
         
