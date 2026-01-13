@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Transaction } from "@/lib/types";
+import { Transaction, isJournalEntry } from "@/lib/types";
 import { 
   Table, 
   TableBody, 
@@ -30,12 +30,13 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertCircle, Wand2, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES, MILEAGE_CATEGORY } from "@shared/categories";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import type { Category } from "@shared/schema";
+import { JournalEntryDialog } from "./JournalEntryDialog";
 
 interface CategorizationRule {
   id: string;
@@ -87,6 +88,10 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
   const [mileageInput, setMileageInput] = useState("");
   const [mileageDescription, setMileageDescription] = useState("");
   const [existingMileageTrip, setExistingMileageTrip] = useState<{ id: string; miles: string; description: string } | null>(null);
+  
+  // Journal entry edit state
+  const [editingJournalTransaction, setEditingJournalTransaction] = useState<Transaction | null>(null);
+  const [showJournalDialog, setShowJournalDialog] = useState(false);
 
   const toggleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -583,14 +588,31 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
                 )}
               </TableCell>
               <TableCell>
-                <Input
-                  data-testid={`input-note-${t.id}`}
-                  placeholder="Add note..."
-                  className="h-7 text-xs"
-                  value={pendingNotes[t.description] ?? notes[t.description] ?? ''}
-                  onChange={(e) => handleNoteChange(t.description, e.target.value)}
-                  onBlur={() => handleNoteBlur(t.description)}
-                />
+                <div className="flex items-center gap-2">
+                  {isJournalEntry(t) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 shrink-0"
+                      onClick={() => {
+                        setEditingJournalTransaction(t);
+                        setShowJournalDialog(true);
+                      }}
+                      data-testid={`button-edit-journal-${t.id}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                  <Input
+                    data-testid={`input-note-${t.id}`}
+                    placeholder="Add note..."
+                    className="h-7 text-xs flex-1"
+                    value={pendingNotes[t.description] ?? notes[t.description] ?? ''}
+                    onChange={(e) => handleNoteChange(t.description, e.target.value)}
+                    onBlur={() => handleNoteBlur(t.description)}
+                  />
+                </div>
               </TableCell>
             </TableRow>
           ))}
@@ -795,6 +817,21 @@ export function TransactionList({ transactions, onUpdateTransaction, onRefresh }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Journal Entry Edit Dialog */}
+      <JournalEntryDialog
+        editTransaction={editingJournalTransaction}
+        open={showJournalDialog}
+        onOpenChange={(open) => {
+          setShowJournalDialog(open);
+          if (!open) setEditingJournalTransaction(null);
+        }}
+        onSuccess={() => {
+          setShowJournalDialog(false);
+          setEditingJournalTransaction(null);
+          onRefresh?.();
+        }}
+      />
     </div>
   );
 }
