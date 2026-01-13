@@ -6,6 +6,19 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Save, Send, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from "lucide-react";
 
+const SESSION_TOKEN_KEY = "auth_session_token";
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem(SESSION_TOKEN_KEY);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 interface EmailConfig {
   postmarkApiToken: string;
   postmarkFromEmail: string;
@@ -32,6 +45,7 @@ export default function EmailSettings() {
   const fetchConfig = async () => {
     try {
       const res = await fetch("/api/email/config", {
+        headers: getAuthHeaders(),
         credentials: "include",
       });
       if (res.ok) {
@@ -64,7 +78,7 @@ export default function EmailSettings() {
     try {
       const res = await fetch("/api/email/config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify(config),
       });
@@ -95,6 +109,7 @@ export default function EmailSettings() {
     try {
       const res = await fetch("/api/email/test", {
         method: "POST",
+        headers: getAuthHeaders(),
         credentials: "include",
       });
 
