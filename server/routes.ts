@@ -181,7 +181,7 @@ export async function registerRoutes(
       await authService.updateLastLogin(user.id);
 
       if (user.twoFactorMethod === "email") {
-        await authService.generateVerificationCode(user.id, "two_factor");
+        await authService.generateVerificationCode(user.id, "two_factor", user.email);
         return res.json({
           sessionToken: session.sessionToken,
           requires2FA: true,
@@ -270,7 +270,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "2FA not enabled for this user" });
       }
 
-      await authService.generateVerificationCode(req.user!.id, "two_factor");
+      await authService.generateVerificationCode(req.user!.id, "two_factor", req.user!.email);
 
       res.json({ success: true, message: "Verification code sent" });
     } catch (error) {

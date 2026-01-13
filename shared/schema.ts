@@ -170,3 +170,19 @@ export const insertBusinessSchema = createInsertSchema(business).omit({
 
 export type InsertBusiness = z.infer<typeof insertBusinessSchema>;
 export type Business = typeof business.$inferSelect;
+
+// App settings for storing email configuration and other app-wide settings
+export const appSettings = pgTable("app_settings", {
+  id: varchar("id").primaryKey().default("default"),
+  postmarkApiToken: text("postmark_api_token"),
+  postmarkFromEmail: text("postmark_from_email"),
+  postmarkFromName: text("postmark_from_name"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAppSettingsSchema = createInsertSchema(appSettings).omit({
+  updatedAt: true,
+});
+
+export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
+export type AppSettings = typeof appSettings.$inferSelect;

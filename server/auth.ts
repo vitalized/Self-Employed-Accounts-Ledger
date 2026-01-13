@@ -14,6 +14,7 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
+import { emailService } from "./email";
 
 const SALT_ROUNDS = 12;
 const SESSION_EXPIRY_HOURS = 24;
@@ -75,7 +76,7 @@ export class AuthService {
     await db.delete(authSessions).where(eq(authSessions.sessionToken, sessionToken));
   }
 
-  async generateVerificationCode(userId: string, purpose: string): Promise<string> {
+  async generateVerificationCode(userId: string, purpose: string, userEmail?: string): Promise<string> {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const codeHash = await bcrypt.hash(code, SALT_ROUNDS);
     const expiresAt = new Date(Date.now() + VERIFICATION_CODE_EXPIRY_MINUTES * 60 * 1000);
@@ -89,7 +90,13 @@ export class AuthService {
       purpose,
     });
 
-    console.log(`[2FA] Verification code for user ${userId}: ${code}`);
+    // Send the code via email if we have the user's email
+    if (userEmail) {
+      await emailService.send2FACode(userEmail, code);
+    } else {
+      // Fallback to console logging if no email provided
+      console.log(`[2FA] Verification code for user ${userId}: ${code}`);
+    }
 
     return code;
   }
