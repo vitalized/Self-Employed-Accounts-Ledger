@@ -8,7 +8,8 @@ import { z } from "zod";
 import crypto from "crypto";
 import { authService, isAuthenticated, require2FA, requireRole } from "./auth";
 import * as XLSX from "xlsx";
-import PdfPrinter from "pdfmake";
+import pdfMake from "pdfmake/build/pdfmake.js";
+import type { TDocumentDefinitions } from "pdfmake/interfaces";
 
 const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
 const STARLING_SANDBOX_API_BASE = "https://api-sandbox.starlingbank.com/api/v2";
@@ -2370,18 +2371,6 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No transactions provided" });
       }
 
-      // Define fonts for pdfmake (using standard fonts)
-      const fonts = {
-        Roboto: {
-          normal: 'Helvetica',
-          bold: 'Helvetica-Bold',
-          italics: 'Helvetica-Oblique',
-          bolditalics: 'Helvetica-BoldOblique'
-        }
-      };
-
-      const printer = new PdfPrinter(fonts);
-
       // Build table body with header row
       const tableBody: any[][] = [
         [
@@ -2408,7 +2397,7 @@ export async function registerRoutes(
       }
 
       // Build document definition
-      const docDefinition: any = {
+      const docDefinition: TDocumentDefinitions = {
         pageSize: 'A4',
         pageMargins: [40, 60, 40, 60],
         content: [
@@ -2448,7 +2437,7 @@ export async function registerRoutes(
 
       // Add summary section if totals provided
       if (totals) {
-        docDefinition.content.push({
+        (docDefinition.content as any[]).push({
           table: {
             widths: ['*', 'auto'],
             body: [
@@ -2476,7 +2465,7 @@ export async function registerRoutes(
       }
 
       // Add transactions table
-      docDefinition.content.push({
+      (docDefinition.content as any[]).push({
         table: {
           headerRows: 1,
           widths: [60, '*', 50, 80, 70],
@@ -2495,30 +2484,21 @@ export async function registerRoutes(
       });
 
       // Add footer
-      docDefinition.content.push({
+      (docDefinition.content as any[]).push({
         text: `Total transactions: ${transactions.length}`,
         fontSize: 9,
         color: '#666666',
         margin: [0, 15, 0, 0]
       });
 
-      // Generate PDF
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+      // Generate PDF using pdfMake
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition);
       
-      const chunks: Buffer[] = [];
-      pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
-      pdfDoc.on('end', () => {
-        const pdfBuffer = Buffer.concat(chunks);
+      pdfDocGenerator.getBuffer((buffer: Buffer) => {
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", "attachment; filename=transactions.pdf");
-        res.send(pdfBuffer);
+        res.send(Buffer.from(buffer));
       });
-      pdfDoc.on('error', (err: Error) => {
-        console.error("PDF generation error:", err);
-        res.status(500).json({ error: "Failed to generate PDF" });
-      });
-      
-      pdfDoc.end();
     } catch (error) {
       console.error("Error exporting to PDF:", error);
       res.status(500).json({ error: "Failed to export" });
