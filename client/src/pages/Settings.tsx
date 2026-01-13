@@ -16,6 +16,7 @@ import ImportExportSettings from "./ImportExportSettings";
 import BusinessSettings from "./BusinessSettings";
 import UsersSettings from "./UsersSettings";
 import SecuritySettings from "./SecuritySettings";
+import EmailSettings from "./EmailSettings";
 import { useDataMode } from "@/lib/dataContext";
 import { SA103_EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@shared/categories";
 import { useQueryClient } from "@tanstack/react-query";
@@ -629,6 +630,9 @@ export default function Settings() {
             <TabsTrigger value="preferences" data-testid="tab-preferences">Preferences</TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="email" data-testid="tab-email">Email</TabsTrigger>
             )}
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
           </TabsList>
@@ -1573,6 +1577,12 @@ export default function Settings() {
           {isAdmin && (
             <TabsContent value="users" className="mt-6">
               <UsersSettings />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="email" className="mt-6">
+              <EmailSettings />
             </TabsContent>
           )}
 

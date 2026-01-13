@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { insertTransactionSchema, updateTransactionSchema, insertCategorizationRuleSchema, insertCategorySchema, insertBusinessSchema, users, passwordCredentials, authSessions, emailVerificationCodes } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
 import { authService, isAuthenticated, require2FA, requireRole } from "./auth";
@@ -2383,6 +2383,113 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error importing categories:", error);
       res.status(500).json({ error: "Failed to import categories" });
+    }
+  });
+
+  // ===================
+  // EMAIL CONFIGURATION ROUTES
+  // ===================
+
+  // Get email config (admin only)
+  app.get("/api/email/config", isAuthenticated, require2FA, requireRole("admin"), async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT postmark_api_token, postmark_from_email, postmark_from_name
+        FROM app_settings WHERE id = 'default'
+      `);
+
+      const settings = result.rows[0] as any;
+      
+      // Mask the API token for security (only show last 4 chars)
+      let maskedToken = "";
+      if (settings?.postmark_api_token) {
+        maskedToken = "•".repeat(32) + settings.postmark_api_token.slice(-4);
+      }
+
+      res.json({
+        postmarkApiToken: maskedToken,
+        postmarkFromEmail: settings?.postmark_from_email || "",
+        postmarkFromName: settings?.postmark_from_name || "Viatlized",
+        isConfigured: !!settings?.postmark_api_token && !!settings?.postmark_from_email,
+      });
+    } catch (error) {
+      console.error("Error fetching email config:", error);
+      res.status(500).json({ error: "Failed to fetch email configuration" });
+    }
+  });
+
+  // Save email config (admin only)
+  app.post("/api/email/config", isAuthenticated, require2FA, requireRole("admin"), async (req, res) => {
+    try {
+      const schema = z.object({
+        postmarkApiToken: z.string().min(1),
+        postmarkFromEmail: z.string().email(),
+        postmarkFromName: z.string().optional(),
+      });
+
+      const data = schema.parse(req.body);
+
+      // Check if the token is masked (not changed) - if so, don't update it
+      const isMaskedToken = data.postmarkApiToken.startsWith("•");
+      
+      if (isMaskedToken) {
+        // Only update email and name
+        await db.execute(sql`
+          INSERT INTO app_settings (id, postmark_from_email, postmark_from_name, updated_at)
+          VALUES ('default', ${data.postmarkFromEmail}, ${data.postmarkFromName || 'Viatlized'}, NOW())
+          ON CONFLICT (id) DO UPDATE SET
+            postmark_from_email = ${data.postmarkFromEmail},
+            postmark_from_name = ${data.postmarkFromName || 'Viatlized'},
+            updated_at = NOW()
+        `);
+      } else {
+        // Update everything including the token
+        await db.execute(sql`
+          INSERT INTO app_settings (id, postmark_api_token, postmark_from_email, postmark_from_name, updated_at)
+          VALUES ('default', ${data.postmarkApiToken}, ${data.postmarkFromEmail}, ${data.postmarkFromName || 'Viatlized'}, NOW())
+          ON CONFLICT (id) DO UPDATE SET
+            postmark_api_token = ${data.postmarkApiToken},
+            postmark_from_email = ${data.postmarkFromEmail},
+            postmark_from_name = ${data.postmarkFromName || 'Viatlized'},
+            updated_at = NOW()
+        `);
+      }
+
+      // Refresh the email service configuration
+      const { emailService } = await import("./email");
+      emailService.refreshConfiguration();
+
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      console.error("Error saving email config:", error);
+      res.status(500).json({ error: "Failed to save email configuration" });
+    }
+  });
+
+  // Test email (admin only)
+  app.post("/api/email/test", isAuthenticated, require2FA, requireRole("admin"), async (req, res) => {
+    try {
+      const { emailService } = await import("./email");
+      
+      const configured = await emailService.ensureConfigured();
+      if (!configured) {
+        return res.status(400).json({ error: "Email is not configured. Please save your Postmark settings first." });
+      }
+
+      const user = req.user!;
+      const success = await emailService.send2FACode(user.email, "123456");
+
+      if (success) {
+        res.json({ success: true, sentTo: user.email });
+      } else {
+        res.status(500).json({ error: "Failed to send test email. Check the server logs for details." });
+      }
+    } catch (error) {
+      console.error("Error sending test email:", error);
+      res.status(500).json({ error: "Failed to send test email" });
     }
   });
 
