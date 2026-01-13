@@ -8,7 +8,6 @@ import { z } from "zod";
 import crypto from "crypto";
 import { authService, isAuthenticated, require2FA, requireRole } from "./auth";
 import * as XLSX from "xlsx";
-import pdfMake from "pdfmake/build/pdfmake.js";
 import type { TDocumentDefinitions } from "pdfmake/interfaces";
 
 const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
@@ -2371,6 +2370,23 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No transactions provided" });
       }
 
+      // Dynamically import pdfmake for server-side use
+      const { createRequire } = await import("module");
+      const require = createRequire(import.meta.url);
+      const PdfPrinter = require("pdfmake/src/printer");
+      
+      // Define fonts for pdfmake using standard PDF fonts
+      const pdfFonts = {
+        Helvetica: {
+          normal: 'Helvetica',
+          bold: 'Helvetica-Bold',
+          italics: 'Helvetica-Oblique',
+          bolditalics: 'Helvetica-BoldOblique'
+        }
+      };
+      
+      const printer = new PdfPrinter(pdfFonts);
+
       // Build table body with header row
       const tableBody: any[][] = [
         [
@@ -2400,6 +2416,9 @@ export async function registerRoutes(
       const docDefinition: TDocumentDefinitions = {
         pageSize: 'A4',
         pageMargins: [40, 60, 40, 60],
+        defaultStyle: {
+          font: 'Helvetica'
+        },
         content: [
           { text: 'Viatlized - Transaction Export', style: 'header' },
           { text: `Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`, style: 'subheader' },
@@ -2491,14 +2510,23 @@ export async function registerRoutes(
         margin: [0, 15, 0, 0]
       });
 
-      // Generate PDF using pdfMake
-      const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+      // Generate PDF
+      const pdfDoc = printer.createPdfKitDocument(docDefinition);
       
-      pdfDocGenerator.getBuffer((buffer: Buffer) => {
+      const chunks: Buffer[] = [];
+      pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      pdfDoc.on('end', () => {
+        const pdfBuffer = Buffer.concat(chunks);
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", "attachment; filename=transactions.pdf");
-        res.send(Buffer.from(buffer));
+        res.send(pdfBuffer);
       });
+      pdfDoc.on('error', (err: Error) => {
+        console.error("PDF generation error:", err);
+        res.status(500).json({ error: "Failed to generate PDF" });
+      });
+      
+      pdfDoc.end();
     } catch (error) {
       console.error("Error exporting to PDF:", error);
       res.status(500).json({ error: "Failed to export" });
