@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface ExpenseBreakdownReportProps {
@@ -16,7 +16,7 @@ export function ExpenseBreakdownReport({ transactions, yearLabel }: ExpenseBreak
     const categories: Record<string, number> = {};
 
     transactions.forEach(t => {
-      if (t.type === 'Business' && t.businessType === 'Expense') {
+      if (t.type === 'Business' && t.businessType === 'Expense' && isIncludedInProfit(t)) {
         const amount = Math.abs(Number(t.amount));
         total += amount;
         if (t.category) {

@@ -246,6 +246,7 @@ export function Filters({ filterState, onFilterChange, onRefresh, onExport, avai
             <SelectItem value="Business Income" className="pl-6 text-muted-foreground">↳ Income</SelectItem>
             <SelectItem value="Business Expense" className="pl-6 text-muted-foreground">↳ Spending</SelectItem>
             <SelectItem value="Personal">Personal</SelectItem>
+            <SelectItem value="Journal">Journal Entries</SelectItem>
             <SelectItem value="Unreviewed">Unreviewed</SelectItem>
           </SelectContent>
         </Select>

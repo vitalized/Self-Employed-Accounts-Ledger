@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { parseISO, format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, FileText, Calendar, CheckCircle, Clock } from "lucide-react";
@@ -45,7 +45,7 @@ export function MTDQuarterlyReport({ transactions, yearLabel }: MTDQuarterlyRepo
       let expenses = 0;
 
       transactions.forEach(t => {
-        if (t.type !== 'Business') return;
+        if (t.type !== 'Business' || !isIncludedInProfit(t)) return;
         const date = parseISO(t.date);
         if (!isWithinInterval(date, { start, end })) return;
 

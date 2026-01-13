@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, FileSpreadsheet, FileText, Calendar } from "lucide-react";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
 import { Category } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
@@ -72,7 +72,7 @@ export function TaxSummary({ transactions, yearLabel, dateRange, setDateRange, t
     };
 
     transactions.forEach(t => {
-      if (t.type !== 'Business') return;
+      if (t.type !== 'Business' || !isIncludedInProfit(t)) return;
       
       const amount = Math.abs(Number(t.amount));
 

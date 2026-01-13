@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, Calendar, AlertCircle, Clock, Info } from "lucide-react";
 import { format, isBefore, isAfter, differenceInDays } from "date-fns";
@@ -119,7 +119,7 @@ export function PaymentOnAccountReport({ transactions, yearLabel }: PaymentOnAcc
     };
 
     transactions.forEach(t => {
-      if (t.type !== 'Business') return;
+      if (t.type !== 'Business' || !isIncludedInProfit(t)) return;
       const amount = Math.abs(Number(t.amount));
       
       if (t.businessType === 'Income') {

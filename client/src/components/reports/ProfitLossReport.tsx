@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts';
 import { parseISO, format } from "date-fns";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -26,7 +26,7 @@ export function ProfitLossReport({ transactions, yearLabel }: ProfitLossReportPr
     const clientIncome: Record<string, { total: number; transactions: Transaction[] }> = {};
 
     transactions.forEach(t => {
-      if (t.type === 'Business') {
+      if (t.type === 'Business' && isIncludedInProfit(t)) {
         const amount = Number(t.amount);
         const date = parseISO(t.date);
         const key = format(date, 'yyyy-MM');

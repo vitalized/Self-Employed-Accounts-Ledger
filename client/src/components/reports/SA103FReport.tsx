@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, FileText, Car, Home } from "lucide-react";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { SA103_EXPENSE_CATEGORIES } from "@shared/categories";
 import { Category } from "@shared/schema";
 import * as XLSX from "xlsx";
@@ -141,7 +141,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
     };
 
     transactions.forEach(t => {
-      if (t.type !== 'Business') return;
+      if (t.type !== 'Business' || !isIncludedInProfit(t)) return;
       const amount = Math.abs(Number(t.amount));
       
       if (t.businessType === 'Income') {
@@ -256,7 +256,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
     const months: Record<string, { name: string, income: number, expenses: number, profit: number }> = {};
     
     transactions.forEach(t => {
-      if (t.type !== 'Business') return;
+      if (t.type !== 'Business' || !isIncludedInProfit(t)) return;
       const date = parseISO(t.date);
       const key = format(date, 'yyyy-MM');
       const name = format(date, 'MMM');
@@ -555,7 +555,7 @@ export function SA103FReport({ transactions, yearLabel }: SA103FReportProps) {
   // Filter transactions by box code
   const getTransactionsForBox = (boxCode: string) => {
     return transactions.filter(t => {
-      if (t.type !== 'Business' || t.businessType !== 'Expense' || !t.category) return false;
+      if (t.type !== 'Business' || t.businessType !== 'Expense' || !t.category || !isIncludedInProfit(t)) return false;
       // Exclude "Covered by Mileage Allowance" - these costs are replaced by the mileage allowance claim
       if (t.category === 'Covered by Mileage Allowance') return false;
       return getBoxCode(t.category) === boxCode;

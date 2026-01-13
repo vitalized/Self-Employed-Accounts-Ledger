@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ export function TaxCalculatorReport({ transactions, yearLabel }: TaxCalculatorRe
     let expenses = 0;
 
     transactions.forEach(t => {
-      if (t.type === 'Business') {
+      if (t.type === 'Business' && isIncludedInProfit(t)) {
         const amount = Number(t.amount);
         if (t.businessType === 'Income') {
           income += amount;

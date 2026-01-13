@@ -6,8 +6,9 @@ import { TransactionList } from "@/components/dashboard/TransactionList";
 import { Filters } from "@/components/dashboard/Filters";
 import { VATTracker } from "@/components/dashboard/VATTracker";
 import { PendingPaymentsTable } from "@/components/dashboard/PendingPaymentsTable";
+import { JournalEntryDialog } from "@/components/dashboard/JournalEntryDialog";
 import { MOCK_TRANSACTIONS } from "@/lib/mockData";
-import { FilterState, Transaction } from "@/lib/types";
+import { FilterState, Transaction, isJournalEntry } from "@/lib/types";
 import { startOfMonth, subMonths, startOfYear, endOfYear, subYears, isWithinInterval, parseISO, endOfMonth, format, isFuture, isAfter, startOfDay } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { 
@@ -180,6 +181,8 @@ export default function Dashboard() {
         if (filters.type === 'Unreviewed') {
           const needsReview = t.type === 'Unreviewed' || (t.type === 'Business' && !t.category);
           if (!needsReview) return false;
+        } else if (filters.type === 'Journal') {
+          if (!isJournalEntry(t)) return false;
         } else if (filters.type === 'Business') {
           if (t.type !== 'Business') return false;
         } else if (filters.type === 'Business Income') {
@@ -431,11 +434,14 @@ export default function Dashboard() {
         <div>
            <div className="flex items-center justify-between py-4">
              <h3 className="text-xl font-semibold">Transactions</h3>
-             <div className="text-sm text-muted-foreground flex items-center gap-4">
-               <span>{filteredTransactions.length} transactions found</span>
-               {lastUpdated && (
-                 <span>Last updated: {format(lastUpdated, "dd MMM yyyy 'at' HH:mm")}</span>
-               )}
+             <div className="flex items-center gap-4">
+               <JournalEntryDialog onSuccess={() => refetch()} />
+               <div className="text-sm text-muted-foreground flex items-center gap-4">
+                 <span>{filteredTransactions.length} transactions found</span>
+                 {lastUpdated && (
+                   <span>Last updated: {format(lastUpdated, "dd MMM yyyy 'at' HH:mm")}</span>
+                 )}
+               </div>
              </div>
            </div>
 

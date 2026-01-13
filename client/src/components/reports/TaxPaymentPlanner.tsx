@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { format, differenceInDays, differenceInCalendarMonths, isBefore, isAfter, addMonths, startOfMonth, endOfMonth } from "date-fns";
 import { Calculator, PiggyBank, Calendar, AlertCircle, TrendingUp, Wallet, Download, FileSpreadsheet, Info } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Cell } from "recharts";
@@ -146,7 +146,7 @@ export function TaxPaymentPlanner({ transactions, yearLabel }: TaxPaymentPlanner
     };
 
     transactions.forEach(t => {
-      if (t.type !== 'Business') return;
+      if (t.type !== 'Business' || !isIncludedInProfit(t)) return;
       const amount = Math.abs(Number(t.amount));
       
       if (t.businessType === 'Income') {

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { ArrowUpRight, ArrowDownRight, Wallet, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -199,8 +199,8 @@ export function StatCards({ transactions, dateLabel }: StatCardsProps) {
     }
   }, [isFirstOpen]);
   
-  const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income');
-  const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense');
+  const incomeTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Income' && isIncludedInProfit(t));
+  const expenseTransactions = transactions.filter(t => t.type === 'Business' && t.businessType === 'Expense' && isIncludedInProfit(t));
   
   const businessIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
   const businessExpense = expenseTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);

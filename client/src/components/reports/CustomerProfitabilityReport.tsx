@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Transaction } from "@/lib/types";
+import { Transaction, isIncludedInProfit } from "@/lib/types";
 import { ArrowUpDown, Search } from "lucide-react";
 import { parseISO, format } from "date-fns";
 
@@ -40,7 +40,7 @@ export function CustomerProfitabilityReport({ transactions, yearLabel }: Custome
     const clients: Record<string, { revenue: number; count: number; dates: string[] }> = {};
 
     transactions.forEach(t => {
-      if (t.type === 'Business' && t.businessType === 'Income') {
+      if (t.type === 'Business' && t.businessType === 'Income' && isIncludedInProfit(t)) {
         const amount = Math.abs(Number(t.amount));
         total += amount;
         
