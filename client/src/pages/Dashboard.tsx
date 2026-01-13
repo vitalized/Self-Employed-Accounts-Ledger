@@ -34,6 +34,7 @@ export default function Dashboard() {
   const updateTransactionMutation = useUpdateTransaction();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [showJournalDialog, setShowJournalDialog] = useState(false);
 
   // Fetch last sync time on load
   useEffect(() => {
@@ -236,7 +237,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleExport = (type: 'csv' | 'my-tax-digital') => {
+  const handleExport = (type: 'csv' | 'excel' | 'pdf') => {
     if (filteredTransactions.length === 0) {
       toast({
         title: "No Data to Export",
@@ -259,47 +260,144 @@ export default function Dashboard() {
       }
     };
 
-    let csvContent: string;
-    let filename: string;
+    // Handle Excel export via API
+    if (type === 'excel') {
+      const exportData = filteredTransactions.map(t => ({
+        date: safeFormatDate(t.date),
+        description: t.description || '',
+        merchant: t.merchant || '',
+        amount: parseFloat(t.amount.toFixed(2)),
+        type: t.type || '',
+        category: t.category || '',
+        status: t.status || '',
+      }));
 
-    if (type === 'my-tax-digital') {
-      // My Tax Digital format - optimized for their import
-      // Columns: Date, Description, Amount, Type, Category
-      const headers = ['Date', 'Description', 'Amount', 'Type', 'Category'];
-      const rows = filteredTransactions.map(t => [
-        safeFormatDate(t.date),
-        `"${(t.description || t.merchant || '').replace(/"/g, '""')}"`,
-        t.amount.toFixed(2),
-        t.type || '',
-        t.category || ''
-      ]);
-      csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      filename = `taxtrack-my-tax-digital-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-      
-      toast({
-        title: "My Tax Digital Export Ready",
-        description: `Exported ${filteredTransactions.length} transactions. Import this file into My Tax Digital and map the columns.`,
-      });
-    } else {
-      // Standard CSV with all details
-      const headers = ['Date', 'Description', 'Merchant', 'Amount', 'Type', 'Category', 'Status'];
-      const rows = filteredTransactions.map(t => [
-        safeFormatDate(t.date),
-        `"${(t.description || '').replace(/"/g, '""')}"`,
-        `"${(t.merchant || '').replace(/"/g, '""')}"`,
-        t.amount.toFixed(2),
-        t.type || '',
-        t.category || '',
-        t.status || ''
-      ]);
-      csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      filename = `taxtrack-export-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-      
-      toast({
-        title: "Export Complete",
-        description: `Exported ${filteredTransactions.length} transactions.`,
-      });
+      fetch('/api/transactions/export-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions: exportData }),
+      })
+        .then(response => {
+          if (!response.ok) throw new Error('Export failed');
+          return response.blob();
+        })
+        .then(blob => {
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `viatlized-export-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(link.href);
+          toast({
+            title: "Excel Export Complete",
+            description: `Exported ${filteredTransactions.length} transactions to Excel.`,
+          });
+        })
+        .catch(error => {
+          console.error('Excel export error:', error);
+          toast({
+            title: "Export Failed",
+            description: "Could not generate Excel file. Please try again.",
+            variant: "destructive",
+          });
+        });
+      return;
     }
+
+    // Handle PDF export via API
+    if (type === 'pdf') {
+      const exportData = filteredTransactions.map(t => ({
+        date: safeFormatDate(t.date),
+        description: t.description || '',
+        merchant: t.merchant || '',
+        amount: parseFloat(t.amount.toFixed(2)),
+        type: t.type || '',
+        businessType: t.businessType || '',
+        category: t.category || '',
+        status: t.status || '',
+      }));
+
+      // Calculate totals
+      const businessTx = filteredTransactions.filter(t =>
+        t.type === 'Business' || (t.type === 'Unreviewed' && (t.businessType === 'Income' || t.businessType === 'Expense'))
+      );
+      const totalIncome = businessTx
+        .filter(t => t.businessType === 'Income')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const totalExpenses = businessTx
+        .filter(t => t.businessType === 'Expense')
+        .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+      const netBalance = totalIncome - totalExpenses;
+
+      fetch('/api/transactions/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          transactions: exportData,
+          totals: { income: totalIncome, expenses: totalExpenses, netBalance },
+        }),
+      })
+        .then(response => {
+          if (!response.ok) throw new Error('Export failed');
+          return response.text();
+        })
+        .then(html => {
+          // Open the HTML in a new window for printing
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            printWindow.document.write(html);
+            printWindow.document.close();
+            toast({
+              title: "Print View Ready",
+              description: `${filteredTransactions.length} transactions ready. Use File > Print or Ctrl+P to save as PDF.`,
+            });
+          } else {
+            // Fallback: download as HTML file
+            const blob = new Blob([html], { type: 'text/html' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `viatlized-export-${format(new Date(), 'yyyy-MM-dd')}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            toast({
+              title: "Export Complete",
+              description: `Open the downloaded file and print to PDF.`,
+            });
+          }
+        })
+        .catch(error => {
+          console.error('PDF export error:', error);
+          toast({
+            title: "Export Failed",
+            description: "Could not generate printable view. Please try again.",
+            variant: "destructive",
+          });
+        });
+      return;
+    }
+
+    // Standard CSV export
+    const headers = ['Date', 'Description', 'Merchant', 'Amount', 'Type', 'Category', 'Status'];
+    const rows = filteredTransactions.map(t => [
+      safeFormatDate(t.date),
+      `"${(t.description || '').replace(/"/g, '""')}"`,
+      `"${(t.merchant || '').replace(/"/g, '""')}"`,
+      t.amount.toFixed(2),
+      t.type || '',
+      t.category || '',
+      t.status || ''
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const filename = `viatlized-export-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    
+    toast({
+      title: "Export Complete",
+      description: `Exported ${filteredTransactions.length} transactions.`,
+    });
 
     // Download the file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -434,14 +532,11 @@ export default function Dashboard() {
         <div>
            <div className="flex items-center justify-between py-4">
              <h3 className="text-xl font-semibold">Transactions</h3>
-             <div className="flex items-center gap-4">
-               <JournalEntryDialog onSuccess={() => refetch()} />
-               <div className="text-sm text-muted-foreground flex items-center gap-4">
-                 <span>{filteredTransactions.length} transactions found</span>
-                 {lastUpdated && (
-                   <span>Last updated: {format(lastUpdated, "dd MMM yyyy 'at' HH:mm")}</span>
-                 )}
-               </div>
+             <div className="text-sm text-muted-foreground flex items-center gap-4">
+               <span>{filteredTransactions.length} transactions found</span>
+               {lastUpdated && (
+                 <span>Last updated: {format(lastUpdated, "dd MMM yyyy 'at' HH:mm")}</span>
+               )}
              </div>
            </div>
 
@@ -450,9 +545,19 @@ export default function Dashboard() {
             onFilterChange={(updates) => setFilters(prev => ({ ...prev, ...updates }))}
             onRefresh={handleRefresh}
             onExport={handleExport}
+            onAddJournalEntry={() => setShowJournalDialog(true)}
             availableCategories={availableCategories}
             isSyncing={isSyncing}
             unreviewedCount={unreviewedCount}
+          />
+
+          <JournalEntryDialog 
+            open={showJournalDialog}
+            onOpenChange={setShowJournalDialog}
+            onSuccess={() => {
+              setShowJournalDialog(false);
+              refetch();
+            }}
           />
 
           {pendingTransactions.length > 0 && (

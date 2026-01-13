@@ -7,6 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
 import { authService, isAuthenticated, require2FA, requireRole } from "./auth";
+import * as XLSX from "xlsx";
 
 const STARLING_API_BASE = "https://api.starlingbank.com/api/v2";
 const STARLING_SANDBOX_API_BASE = "https://api-sandbox.starlingbank.com/api/v2";
@@ -2322,6 +2323,131 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error importing rules:", error);
       res.status(500).json({ error: "Failed to import rules" });
+    }
+  });
+
+  // Export transactions to Excel
+  app.post("/api/transactions/export-excel", async (req, res) => {
+    try {
+      const { transactions } = req.body;
+      if (!transactions || !Array.isArray(transactions)) {
+        return res.status(400).json({ error: "No transactions provided" });
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(transactions);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
+
+      // Set column widths
+      worksheet["!cols"] = [
+        { wch: 12 }, // Date
+        { wch: 40 }, // Description
+        { wch: 30 }, // Merchant
+        { wch: 12 }, // Amount
+        { wch: 12 }, // Type
+        { wch: 20 }, // Category
+        { wch: 10 }, // Status
+        { wch: 30 }, // Note
+      ];
+
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", "attachment; filename=transactions.xlsx");
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      res.status(500).json({ error: "Failed to export to Excel" });
+    }
+  });
+
+  // Export transactions to PDF (simple HTML-based PDF)
+  app.post("/api/transactions/export-pdf", async (req, res) => {
+    try {
+      const { transactions, totals } = req.body;
+      if (!transactions || !Array.isArray(transactions)) {
+        return res.status(400).json({ error: "No transactions provided" });
+      }
+
+      // Build a simple HTML document that can be printed/saved as PDF
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Transaction Export</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; font-size: 11px; }
+    h1 { color: #333; font-size: 18px; margin-bottom: 5px; }
+    .summary { margin-bottom: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+    .summary-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .summary-label { font-weight: bold; }
+    .income { color: #16a34a; }
+    .expense { color: #dc2626; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+    th { background-color: #f5f5f5; font-weight: bold; }
+    tr:nth-child(even) { background-color: #fafafa; }
+    .amount { text-align: right; font-family: monospace; }
+    .positive { color: #16a34a; }
+    .negative { color: #333; }
+    .date-generated { color: #666; font-size: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Viatlized - Transaction Export</h1>
+  <p class="date-generated">Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+  
+  ${totals ? `
+  <div class="summary">
+    <div class="summary-row">
+      <span class="summary-label">Total Income:</span>
+      <span class="income">£${totals.income?.toFixed(2) || '0.00'}</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Total Expenses:</span>
+      <span class="expense">-£${totals.expenses?.toFixed(2) || '0.00'}</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Net Balance:</span>
+      <span class="${(totals.netBalance || 0) >= 0 ? 'income' : 'expense'}">£${totals.netBalance?.toFixed(2) || '0.00'}</span>
+    </div>
+  </div>
+  ` : ''}
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Type</th>
+        <th>Category</th>
+        <th class="amount">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${transactions.map((t: { date: string; description: string; type: string; category: string; amount: number }) => `
+        <tr>
+          <td>${t.date}</td>
+          <td>${t.description}</td>
+          <td>${t.type}</td>
+          <td>${t.category || '-'}</td>
+          <td class="amount ${t.amount >= 0 ? 'positive' : 'negative'}">${t.amount >= 0 ? '+' : ''}£${Math.abs(t.amount).toFixed(2)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <p class="date-generated">Total transactions: ${transactions.length}</p>
+</body>
+</html>`;
+
+      res.setHeader("Content-Type", "text/html");
+      res.setHeader("Content-Disposition", "attachment; filename=transactions.html");
+      res.send(html);
+    } catch (error) {
+      console.error("Error exporting to PDF:", error);
+      res.status(500).json({ error: "Failed to export" });
     }
   });
 
