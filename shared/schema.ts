@@ -30,6 +30,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   createdAt: true,
 }).extend({
   amount: z.string().or(z.number()), // Allow both string and number for amount
+  date: z.coerce.date(), // Accept string or Date and coerce to Date
 });
 
 export const selectTransactionSchema = createSelectSchema(transactions);
