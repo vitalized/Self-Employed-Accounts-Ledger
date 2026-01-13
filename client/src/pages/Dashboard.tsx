@@ -341,39 +341,26 @@ export default function Dashboard() {
       })
         .then(response => {
           if (!response.ok) throw new Error('Export failed');
-          return response.text();
+          return response.blob();
         })
-        .then(html => {
-          // Open the HTML in a new window for printing
-          const printWindow = window.open('', '_blank');
-          if (printWindow) {
-            printWindow.document.write(html);
-            printWindow.document.close();
-            toast({
-              title: "Print View Ready",
-              description: `${filteredTransactions.length} transactions ready. Use File > Print or Ctrl+P to save as PDF.`,
-            });
-          } else {
-            // Fallback: download as HTML file
-            const blob = new Blob([html], { type: 'text/html' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `viatlized-export-${format(new Date(), 'yyyy-MM-dd')}.html`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
-            toast({
-              title: "Export Complete",
-              description: `Open the downloaded file and print to PDF.`,
-            });
-          }
+        .then(blob => {
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `viatlized-export-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(link.href);
+          toast({
+            title: "PDF Export Complete",
+            description: `Exported ${filteredTransactions.length} transactions to PDF.`,
+          });
         })
         .catch(error => {
           console.error('PDF export error:', error);
           toast({
             title: "Export Failed",
-            description: "Could not generate printable view. Please try again.",
+            description: "Could not generate PDF. Please try again.",
             variant: "destructive",
           });
         });
